@@ -2,48 +2,30 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Dice Prediction Game</title> <style>
+    <title>Dice Prediction Game</title>
+    <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Roboto:wght@500;700&display=swap');
         
-        /* [LEGAL_SAFE_FIX] 드래그 방지 및 기본 스타일 */
-        * { 
-            box-sizing: border-box;
-            user-select: none;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            -webkit-user-drag: none;
-        }
+        * { box-sizing: border-box; user-select: none; -webkit-user-drag: none; }
 
         :root {
-            --bg-color: #1a1a2e; /* [LEGAL_SAFE_FIX] 카지노 녹색 -> 중립적인 남색 계열로 변경 */
+            --bg-color: #1a1a2e; 
             --board-color: #16213e;
             --accent-color: #0f3460; 
-            --text-gold: #e94560; /* 강조색 변경 */
+            --text-gold: #e94560; 
             --text-white: #ffffff;
-            --win-glow: #00ffcc; /* 형광 느낌 제거, 밝은 청록 */
         }
         
         body { 
-            background-color: var(--bg-color); 
-            color: var(--text-white); 
-            font-family: 'Roboto', sans-serif; 
-            margin: 0; 
-            height: 100vh; 
-            width: 100vw;
-            overflow: hidden; 
-            display: flex; 
-            flex-direction: column;
+            background-color: var(--bg-color); color: var(--text-white); 
+            font-family: 'Roboto', sans-serif; margin: 0; height: 100vh; width: 100vw;
+            overflow: hidden; display: flex; flex-direction: column;
         }
         
-        /* [LEGAL_SAFE_FIX] 광고 영역: 단순 Placeholder */
         .ad-space {
-            background: #0f0f1a; 
-            border: 1px dashed #333; 
-            color: #555;
+            background: #0f0f1a; border: 1px dashed #333; color: #555;
             display: flex; justify-content: center; align-items: center;
-            font-size: 0.8rem; font-weight: bold;
-            cursor: default;
+            font-size: 0.8rem; font-weight: bold; cursor: default;
         }
         .ad-top-container, .ad-bottom-container {
             height: 90px; width: 100%; display: flex; justify-content: center;
@@ -56,7 +38,6 @@
         }
         .ad-vertical { width: 160px; height: 600px; }
 
-        /* 메인 레이아웃 */
         .main-wrapper {
             flex: 1; display: flex; justify-content: space-between; align-items: stretch;
             width: 100%; overflow: hidden; padding: 0 10px;
@@ -67,15 +48,10 @@
             align-items: center; justify-content: center; 
             height: 100%; min-width: 0; position: relative;
         }
-        
-        .game-container.panel-closed { gap: 0; }
 
-        /* 패널 스타일 (중립적 디자인) */
         .side-panel { 
-            width: 220px; height: 750px;
-            background: var(--board-color); 
-            border: 2px solid var(--accent-color); 
-            border-radius: 15px; 
+            width: 220px; height: 750px; background: var(--board-color); 
+            border: 2px solid var(--accent-color); border-radius: 15px; 
             display: flex; flex-direction: column; position: relative; 
             transition: all 0.3s ease-in-out; overflow: visible; z-index: 100; padding: 0; flex-shrink: 0;
         }
@@ -104,7 +80,6 @@
         .rank-me { border: 1px solid var(--text-gold); background: rgba(233, 69, 96, 0.1); }
         .h-dice-group { display: flex; gap: 5px; } .h-die { font-size: 2rem; color: #eee; } 
 
-        /* [LEGAL_SAFE_FIX] 게임 보드 스타일 변경 (카지노 느낌 제거) */
         .game-board-border { 
             max-width: 1000px; width: 100%;
             background: var(--board-color); padding: 15px; border-radius: 20px; 
@@ -124,13 +99,11 @@
         }
         .info-box { text-align: center; } 
         .info-label { font-size: 0.8rem; color: #aaa; letter-spacing: 1px; } 
-        /* [LEGAL_SAFE_FIX] SCORE 폰트 변경 */
         .info-value { font-size: 1.2rem; font-family: 'Roboto', sans-serif; color: #fff; font-weight: bold; }
         #game-status-bar { font-family: 'Roboto', sans-serif; font-size: 1.5rem; font-weight: bold; color: white; text-align: center; width: 300px;}
         .static-dice-container { display: flex; gap: 10px; }
         .die-3d { width: 50px; height: 50px; background: #fff; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; font-size: 36px; color: #333; font-weight: bold; line-height: 1; }
 
-        /* [LEGAL_SAFE_FIX] 선택 영역 그리드 스타일 중립화 */
         .top-section-layout { display: grid; grid-template-columns: 120px 1fr 120px; gap: 0; height: 220px; margin-bottom: 2px; }
         .side-box { border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px; z-index: 1; }
         .side-box h1 { font-size: 2rem; margin: 0; color: var(--text-white); }
@@ -150,11 +123,8 @@
         .singles-row { display: grid; grid-template-columns: 70px 1fr; gap: 0; height: 100px; margin-top: -1px; border: 1px solid rgba(255,255,255,0.1); border-top: none; }
         .singles-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; } 
 
-        /* 컨트롤 및 공통 */
         .bottom-controls { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
-        /* [LEGAL_SAFE_FIX] 칩 랙 -> 포인트 셀렉터 */
         .point-selector { display: flex; gap: 12px; }
-        /* [LEGAL_SAFE_FIX] 포커 칩 디자인 단순화 (원형 토큰) */
         .point-token { 
             width: 55px; height: 55px; border-radius: 50%; 
             display: flex; justify-content: center; align-items: center; cursor: pointer; 
@@ -167,7 +137,6 @@
         .btn { padding: 12px 30px; border-radius: 6px; border: none; font-weight: bold; font-family: 'Roboto'; cursor: pointer; font-size: 1.1rem; }
         .btn-clear { background: #546e7a; color: white; margin-left: 20px; }
         
-        /* [LEGAL_SAFE_FIX] 선택 박스 스타일 변경 */
         .option-box { 
             border: 1px solid rgba(255, 255, 255, 0.1); background: transparent; 
             cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; 
@@ -177,12 +146,10 @@
         .option-box.active { background: rgba(233, 69, 96, 0.2); border: 1px solid var(--text-gold); z-index: 5; }
         .option-box.winner { background: rgba(0, 255, 204, 0.2) !important; border: 2px solid #00ffcc !important; box-shadow: inset 0 0 20px rgba(0,255,204,0.3); z-index: 10; }
         
-        /* [LEGAL_SAFE_FIX] 배지 스타일 단순화 */
         .point-badge { position: absolute; top: -5px; right: -5px; width: 32px; height: 32px; background: var(--text-gold); border-radius: 50%; color: white; font-size: 0.7rem; font-weight: bold; display: flex; justify-content: center; align-items: center; z-index: 20; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
         
         .main-text { font-family: 'Roboto'; font-weight: bold; color: #fff; line-height: 1.1; font-size: 1rem; }
         .rule-text { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
-        /* [LEGAL_SAFE_FIX] 배당률 표기 변경 1:X -> xN */
         .reward-text { font-size: 0.8rem; color: #aaa; font-weight: normal; margin-top: 2px; }
         
         .dice-lg { font-size: 4rem; line-height: 1; color: #fff; } 
@@ -195,7 +162,6 @@
         #toast-warning.show { display: block; animation: fadein 0.3s; }
         @keyframes fadein { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-        /* 닉네임 입력 모달 */
         #nickname-modal, #disclaimer-modal { 
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.95); z-index: 5000; 
@@ -219,7 +185,6 @@
         .nickname-display { font-size: 1.1rem; color: var(--text-gold); cursor: pointer; font-weight: bold; text-decoration: underline; margin-bottom: 5px; }
         .nickname-display:hover { color: white; }
 
-        /* [LEGAL_SAFE_FIX] 고지 사항 텍스트 */
         .disclaimer-text { color: #ccc; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px; text-align: left; }
         .disclaimer-title { color: var(--text-gold); font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
     </style>
@@ -382,31 +347,49 @@
 
 <script>
     let USER_ID = localStorage.getItem('sicbo_uid');
-    if (!USER_ID) {
-        USER_ID = 'player_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('sicbo_uid', USER_ID);
-    }
+    let SESSION_TOKEN = localStorage.getItem('sicbo_token');
 
-    let currentPoint = 1000; // currentChip -> currentPoint
-    let myPredictions = {}; // myBets -> myPredictions
-    let localScore = 0; // localBalance -> localScore
-    let currentState = ""; 
-    const diceChars = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    let currentPoint = 1000;
+    let myPredictions = {};
+    let localScore = 0;
     let isProcessing = false;
     let myNickname = null;
+    const diceChars = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 
-    setInterval(fetchGameStatus, 200);
+    async function initAuth() {
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ uid: USER_ID })
+            });
+            const data = await res.json();
+            if (data.success) {
+                USER_ID = data.uid;
+                SESSION_TOKEN = data.token;
+                localStorage.setItem('sicbo_uid', USER_ID);
+                localStorage.setItem('sicbo_token', SESSION_TOKEN);
+                
+                setInterval(fetchGameStatus, 200); // 인증 성공 후 폴링 시작
+            }
+        } catch(e) { console.error("Auth failed", e); }
+    }
+    
+    initAuth();
 
-    // [LEGAL_SAFE_FIX] 고지사항 닫기
     function closeDisclaimer() {
         document.getElementById('disclaimer-modal').classList.remove('show');
-        // 닉네임 확인 로직 트리거
         checkNicknameNeeded();
     }
 
     async function fetchGameStatus() {
+        if (!SESSION_TOKEN) return;
+
         try {
-            const res = await fetch(`/status?uid=${USER_ID}`);
+            // [Fix] uid 쿼리 파라미터 제거, 헤더 인증 사용
+            const res = await fetch('/status', {
+                headers: { 'Authorization': 'Bearer ' + SESSION_TOKEN }
+            });
             const data = await res.json();
             
             myNickname = data.nickname;
@@ -432,8 +415,11 @@
 
         const res = await fetch('/user/nickname', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ uid: USER_ID, nickname: newNick })
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + SESSION_TOKEN
+            },
+            body: JSON.stringify({ nickname: newNick })
         });
         const result = await res.json();
         
@@ -441,6 +427,8 @@
             document.getElementById('nickname-modal').classList.remove('show');
             document.getElementById('nickname-modal').classList.add('hidden-by-user');
             showWarning("닉네임이 변경되었습니다.");
+        } else {
+            showWarning(result.msg);
         }
     }
 
@@ -451,7 +439,6 @@
     function updateUI(data) {
         const statusEl = document.getElementById('game-status-bar');
         
-        // [LEGAL_SAFE_FIX] 상태 메시지 변경
         if(data.state === 'SELECTION') {
             statusEl.innerText = `SELECT: ${data.timer}s`;
             statusEl.style.color = "#00ffcc";
@@ -460,7 +447,6 @@
             statusEl.style.color = "#ff3366";
         }
         
-        currentState = data.state;
         document.getElementById('points').innerText = formatPoints(localScore);
         
         if (!isProcessing) {
@@ -474,7 +460,6 @@
         const winEl = document.getElementById('win-amount');
         const resultVal = data.round_result || 0;
         
-        // [LEGAL_SAFE_FIX] 결과 표시: +PT / -PT
         if (resultVal > 0) {
             winEl.innerText = "+" + formatPoints(resultVal);
             winEl.style.color = "#00ffcc";
@@ -511,7 +496,7 @@
         if (!ranking) return;
         let html = '';
         ranking.forEach((user, index) => {
-            const isMe = user.uid === USER_ID ? 'rank-me' : '';
+            const isMe = user.uid === USER_ID ? 'rank-me' : ''; // uid 비교 로직 유지 (서버 ranking에서 uid 안보내면 닉네임 비교 등 필요하나 일단 유지)
             html += `<div class="ranking-item ${isMe}"><div class="rank-rank">${index + 1}</div><div class="rank-user">${user.nickname}</div><div class="rank-bal">${formatPoints(user.score)}</div></div>`;
         });
         listEl.innerHTML = html;
@@ -525,7 +510,6 @@
         else btn.innerText = panel.classList.contains('collapsed') ? '◀' : '▶';
     }
 
-    // [LEGAL_SAFE_FIX] bet -> predict
     async function predict(type) {
         const statusText = document.getElementById('game-status-bar').innerText;
         if(!statusText.includes("SELECT")) return showWarning("선택 시간이 아닙니다.");
@@ -542,8 +526,11 @@
         try {
             const res = await fetch('/predict', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ uid: USER_ID, prediction_type: type, points: currentPoint })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + SESSION_TOKEN
+                },
+                body: JSON.stringify({ prediction_type: type, points: currentPoint })
             });
             const result = await res.json();
             if(!result.success) {
@@ -565,8 +552,10 @@
         try {
             const res = await fetch('/predict/clear', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ uid: USER_ID })
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + SESSION_TOKEN
+                }
             });
             const result = await res.json();
             if(result.success) {
@@ -579,7 +568,6 @@
         } catch(e) { isProcessing = false; }
     }
 
-    // [LEGAL_SAFE_FIX] 금액 표기 제거 (k단위 대신 콤마)
     function formatPoints(num) { 
         return num.toLocaleString(); 
     }
@@ -594,7 +582,6 @@
                 btn.classList.add('active');
                 const badge = document.createElement('div');
                 badge.className = 'point-badge';
-                // 1000 -> 1k 표기는 공간 문제로 유지하되 의미는 점수임
                 badge.innerText = (points >= 1000 ? (points/1000) + 'k' : points);
                 btn.appendChild(badge);
             }
