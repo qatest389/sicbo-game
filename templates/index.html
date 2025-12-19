@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Dice Prediction Game</title> <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Roboto:wght@500;700&display=swap');
+        
+        /* [LEGAL_SAFE_FIX] 드래그 방지 및 기본 스타일 */
+        * { 
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        :root {
+            --bg-color: #1a1a2e; /* [LEGAL_SAFE_FIX] 카지노 녹색 -> 중립적인 남색 계열로 변경 */
+            --board-color: #16213e;
+            --accent-color: #0f3460; 
+            --text-gold: #e94560; /* 강조색 변경 */
+            --text-white: #ffffff;
+            --win-glow: #00ffcc; /* 형광 느낌 제거, 밝은 청록 */
+        }
+        
+        body { 
+            background-color: var(--bg-color); 
+            color: var(--text-white); 
+            font-family: 'Roboto', sans-serif; 
+            margin: 0; 
+            height: 100vh; 
+            width: 100vw;
+            overflow: hidden; 
+            display: flex; 
+            flex-direction: column;
+        }
+        
+        /* [LEGAL_SAFE_FIX] 광고 영역: 단순 Placeholder */
+        .ad-space {
+            background: #0f0f1a; 
+            border: 1px dashed #333; 
+            color: #555;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 0.8rem; font-weight: bold;
+            cursor: default;
+        }
+        .ad-top-container, .ad-bottom-container {
+            height: 90px; width: 100%; display: flex; justify-content: center;
+            background: #0a0a12; flex-shrink: 0; z-index: 200;
+        }
+        .ad-horizontal { width: 728px; height: 90px; }
+        .ad-vertical-container {
+            width: 160px; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; flex-shrink: 0;
+        }
+        .ad-vertical { width: 160px; height: 600px; }
+
+        /* 메인 레이아웃 */
+        .main-wrapper {
+            flex: 1; display: flex; justify-content: space-between; align-items: stretch;
+            width: 100%; overflow: hidden; padding: 0 10px;
+        }
+
+        .game-container { 
+            flex: 1; display: flex; gap: 15px; 
+            align-items: center; justify-content: center; 
+            height: 100%; min-width: 0; position: relative;
+        }
+        
+        .game-container.panel-closed { gap: 0; }
+
+        /* 패널 스타일 (중립적 디자인) */
+        .side-panel { 
+            width: 220px; height: 750px;
+            background: var(--board-color); 
+            border: 2px solid var(--accent-color); 
+            border-radius: 15px; 
+            display: flex; flex-direction: column; position: relative; 
+            transition: all 0.3s ease-in-out; overflow: visible; z-index: 100; padding: 0; flex-shrink: 0;
+        }
+        .side-panel.collapsed { width: 0; border-width: 0; margin: 0; opacity: 1; }
+        .panel-content { padding: 15px; width: 220px; height: 100%; display: flex; flex-direction: column; transition: opacity 0.2s; opacity: 1; }
+        .side-panel.collapsed .panel-content { opacity: 0; pointer-events: none; display: none; }
+        .panel-title { font-family: 'Roboto', sans-serif; color: var(--text-white); text-align: center; width: 100%; font-size: 1.2rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--accent-color); display: block; font-weight: bold; }
+        
+        .toggle-btn {
+            position: absolute; top: 20px; width: 30px; height: 60px; 
+            background: var(--accent-color); border: 2px solid var(--accent-color); color: var(--text-white); 
+            display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 101; 
+            font-size: 1.2rem; box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .history-toggle-btn { right: -30px; border-left: none; border-radius: 0 10px 10px 0; }
+        .ranking-toggle-btn { left: -30px; border-right: none; border-radius: 10px 0 0 10px; }
+
+        .scroll-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 5px; }
+        .scroll-list::-webkit-scrollbar { width: 6px; } 
+        .scroll-list::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        .history-item, .ranking-item { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 10px; width: 100%; display: flex; justify-content: center; align-items: center; border: 1px solid rgba(255,255,255,0.1); }
+        .ranking-item { justify-content: space-between; }
+        .rank-rank { color: var(--text-gold); width: 25px; font-weight: bold; }
+        .rank-user { color: white; flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 5px; }
+        .rank-bal { color: #00ffcc; font-weight: bold; font-size: 0.8rem; }
+        .rank-me { border: 1px solid var(--text-gold); background: rgba(233, 69, 96, 0.1); }
+        .h-dice-group { display: flex; gap: 5px; } .h-die { font-size: 2rem; color: #eee; } 
+
+        /* [LEGAL_SAFE_FIX] 게임 보드 스타일 변경 (카지노 느낌 제거) */
+        .game-board-border { 
+            max-width: 1000px; width: 100%;
+            background: var(--board-color); padding: 15px; border-radius: 20px; 
+            border: 4px solid var(--accent-color); 
+            box-shadow: 0 0 40px rgba(0,0,0,0.5); 
+            display: flex; flex-direction: column;
+        }
+        .game-board-inner { 
+            border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 5px; 
+            display: flex; flex-direction: column; gap: 5px;
+        }
+
+        .top-info-section { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 10px 30px; background: rgba(0,0,0,0.2); 
+            border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; margin-bottom: 5px;
+        }
+        .info-box { text-align: center; } 
+        .info-label { font-size: 0.8rem; color: #aaa; letter-spacing: 1px; } 
+        /* [LEGAL_SAFE_FIX] SCORE 폰트 변경 */
+        .info-value { font-size: 1.2rem; font-family: 'Roboto', sans-serif; color: #fff; font-weight: bold; }
+        #game-status-bar { font-family: 'Roboto', sans-serif; font-size: 1.5rem; font-weight: bold; color: white; text-align: center; width: 300px;}
+        .static-dice-container { display: flex; gap: 10px; }
+        .die-3d { width: 50px; height: 50px; background: #fff; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; font-size: 36px; color: #333; font-weight: bold; line-height: 1; }
+
+        /* [LEGAL_SAFE_FIX] 선택 영역 그리드 스타일 중립화 */
+        .top-section-layout { display: grid; grid-template-columns: 120px 1fr 120px; gap: 0; height: 220px; margin-bottom: 2px; }
+        .side-box { border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px; z-index: 1; }
+        .side-box h1 { font-size: 2rem; margin: 0; color: var(--text-white); }
+        .center-grid { display: grid; grid-template-columns: repeat(3, 1fr) 1.5fr repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 0; grid-template-areas: "t1 t2 t3 any t4 t5 t6" "d1 d2 d3 any d4 d5 d6"; }
+        
+        #btn-TRIPLE_1 { grid-area: t1; } #btn-TRIPLE_2 { grid-area: t2; } #btn-TRIPLE_3 { grid-area: t3; } #btn-TRIPLE_4 { grid-area: t4; } #btn-TRIPLE_5 { grid-area: t5; } #btn-TRIPLE_6 { grid-area: t6; }
+        #btn-DOUBLE_1 { grid-area: d1; } #btn-DOUBLE_2 { grid-area: d2; } #btn-DOUBLE_3 { grid-area: d3; } #btn-DOUBLE_4 { grid-area: d4; } #btn-DOUBLE_5 { grid-area: d5; } #btn-DOUBLE_6 { grid-area: d6; }
+        #btn-ANY_TRIPLE { grid-area: any; background: rgba(255,255,255,0.05); }
+
+        .totals-row { display: grid; grid-template-columns: repeat(14, 1fr); gap: 0; height: 80px; }
+        .total-item { justify-content: space-between; padding: 5px 0; background: rgba(255,255,255,0.03); }
+        .total-num { font-size: 1.5rem; font-weight: bold; color: #fff; font-family: 'Roboto'; }
+
+        .combos-row { display: grid; grid-template-columns: 70px 1fr; gap: 0; height: 85px; margin-top: 2px; border: 1px solid rgba(255,255,255,0.1); }
+        .combo-grid { display: grid; grid-template-columns: repeat(15, 1fr); gap: 0; } 
+
+        .singles-row { display: grid; grid-template-columns: 70px 1fr; gap: 0; height: 100px; margin-top: -1px; border: 1px solid rgba(255,255,255,0.1); border-top: none; }
+        .singles-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; } 
+
+        /* 컨트롤 및 공통 */
+        .bottom-controls { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        /* [LEGAL_SAFE_FIX] 칩 랙 -> 포인트 셀렉터 */
+        .point-selector { display: flex; gap: 12px; }
+        /* [LEGAL_SAFE_FIX] 포커 칩 디자인 단순화 (원형 토큰) */
+        .point-token { 
+            width: 55px; height: 55px; border-radius: 50%; 
+            display: flex; justify-content: center; align-items: center; cursor: pointer; 
+            background: #2a2a40; border: 2px solid var(--accent-color); 
+            color: white; font-weight: bold; font-size: 0.8rem;
+            transition: transform 0.2s;
+        }
+        .point-token.selected { transform: translateY(-10px); border-color: var(--text-gold); background: var(--text-gold); color: black; }
+        
+        .btn { padding: 12px 30px; border-radius: 6px; border: none; font-weight: bold; font-family: 'Roboto'; cursor: pointer; font-size: 1.1rem; }
+        .btn-clear { background: #546e7a; color: white; margin-left: 20px; }
+        
+        /* [LEGAL_SAFE_FIX] 선택 박스 스타일 변경 */
+        .option-box { 
+            border: 1px solid rgba(255, 255, 255, 0.1); background: transparent; 
+            cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            position: relative; margin: -1px; z-index: 1; overflow: visible; padding: 2px; 
+        }
+        .option-box:hover { background: rgba(255, 255, 255, 0.05); z-index: 2; border-color: rgba(255,255,255,0.3); }
+        .option-box.active { background: rgba(233, 69, 96, 0.2); border: 1px solid var(--text-gold); z-index: 5; }
+        .option-box.winner { background: rgba(0, 255, 204, 0.2) !important; border: 2px solid #00ffcc !important; box-shadow: inset 0 0 20px rgba(0,255,204,0.3); z-index: 10; }
+        
+        /* [LEGAL_SAFE_FIX] 배지 스타일 단순화 */
+        .point-badge { position: absolute; top: -5px; right: -5px; width: 32px; height: 32px; background: var(--text-gold); border-radius: 50%; color: white; font-size: 0.7rem; font-weight: bold; display: flex; justify-content: center; align-items: center; z-index: 20; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        
+        .main-text { font-family: 'Roboto'; font-weight: bold; color: #fff; line-height: 1.1; font-size: 1rem; }
+        .rule-text { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
+        /* [LEGAL_SAFE_FIX] 배당률 표기 변경 1:X -> xN */
+        .reward-text { font-size: 0.8rem; color: #aaa; font-weight: normal; margin-top: 2px; }
+        
+        .dice-lg { font-size: 4rem; line-height: 1; color: #fff; } 
+        .dice-md { font-size: 3.5rem; line-height: 1; color: #fff; } 
+        .dice-sm { font-size: 1.6rem; line-height: 1; color: #fff; }
+        .domino { display: flex; gap: 5px; }
+        .row-label { display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px solid rgba(255,255,255,0.1); color: var(--text-white); text-align: center; background: rgba(0,0,0,0.2); }
+
+        #toast-warning { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #ff5252; padding: 15px 30px; border-radius: 30px; border: 2px solid #ff5252; display: none; z-index: 3000; font-weight: bold; }
+        #toast-warning.show { display: block; animation: fadein 0.3s; }
+        @keyframes fadein { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+        /* 닉네임 입력 모달 */
+        #nickname-modal, #disclaimer-modal { 
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.95); z-index: 5000; 
+            display: none; justify-content: center; align-items: center; 
+        }
+        #nickname-modal.show, #disclaimer-modal.show { display: flex; }
+        
+        .modal-box { 
+            background: #1a1a2e; border: 2px solid var(--text-gold); padding: 40px; 
+            border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.8); max-width: 400px; width: 90%;
+        }
+        .nick-input { 
+            background: #2a2a40; border: 1px solid #555; color: white; 
+            font-size: 1.2rem; padding: 10px; margin: 20px 0; border-radius: 5px; text-align: center; font-family: 'Roboto'; width: 100%;
+        }
+        .action-btn { 
+            background: var(--text-gold); color: white; font-weight: bold; 
+            padding: 12px 30px; font-size: 1rem; cursor: pointer; border: none; border-radius: 5px; width: 100%;
+        }
+        
+        .nickname-display { font-size: 1.1rem; color: var(--text-gold); cursor: pointer; font-weight: bold; text-decoration: underline; margin-bottom: 5px; }
+        .nickname-display:hover { color: white; }
+
+        /* [LEGAL_SAFE_FIX] 고지 사항 텍스트 */
+        .disclaimer-text { color: #ccc; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px; text-align: left; }
+        .disclaimer-title { color: var(--text-gold); font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="ad-top-container"><div class="ad-space ad-horizontal">AD AREA (No Rewards)</div></div>
+
+    <div class="main-wrapper">
+        <div class="ad-vertical-container"><div class="ad-space ad-vertical">AD AREA</div></div>
+
+        <div class="game-container" id="gameContainer">
+            <div class="side-panel" id="historyPanel">
+                <div class="toggle-btn history-toggle-btn" onclick="togglePanel('historyPanel', 'gameContainer', 'left')">◀</div>
+                <div class="panel-content">
+                    <div class="panel-title">HISTORY</div>
+                    <div class="scroll-list" id="historyList"></div>
+                </div>
+            </div>
+
+            <div class="game-board-border">
+                <div class="game-board-inner">
+                    <div class="top-info-section">
+                        <div class="info-box">
+                            <div class="info-label">SCORE</div>
+                            <div class="info-value" id="points">0</div>
+                        </div>
+                        
+                        <div style="display:flex; flex-direction:column; align-items:center;">
+                            <div id="my-nickname" class="nickname-display" onclick="openNickModal()">Guest 🖊️</div>
+                            <div id="game-status-bar">CONNECTING...</div>
+                        </div>
+
+                        <div class="static-dice-container">
+                            <div class="die-3d" id="d1">?</div><div class="die-3d" id="d2">?</div><div class="die-3d" id="d3">?</div>
+                        </div>
+                        <div class="info-box"><div class="info-label">LAST RESULT</div><div class="info-value" id="win-amount" style="color:#00ffcc;">0</div></div>
+                    </div>
+
+                    <div class="top-section-layout">
+                        <div class="option-box side-box small" onclick="predict('SMALL')" id="btn-SMALL"><h1>SMALL</h1><div class="rule-text">4-10</div><div class="reward-text">x1</div></div>
+                        <div class="center-grid">
+                            <div class="option-box" onclick="predict('TRIPLE_1')" id="btn-TRIPLE_1"><span class="dice-md">⚀</span><span class="reward-text">x180</span></div>
+                            <div class="option-box" onclick="predict('TRIPLE_2')" id="btn-TRIPLE_2"><span class="dice-md">⚁</span><span class="reward-text">x180</span></div>
+                            <div class="option-box" onclick="predict('TRIPLE_3')" id="btn-TRIPLE_3"><span class="dice-md">⚂</span><span class="reward-text">x180</span></div>
+                            <div class="option-box" onclick="predict('ANY_TRIPLE')" id="btn-ANY_TRIPLE"><div class="main-text">ANY<br>TRIPLE</div><div class="dice-md">⚀⚂⚅</div><div class="reward-text">x30</div></div>
+                            <div class="option-box" onclick="predict('TRIPLE_4')" id="btn-TRIPLE_4"><span class="dice-md">⚃</span><span class="reward-text">x180</span></div>
+                            <div class="option-box" onclick="predict('TRIPLE_5')" id="btn-TRIPLE_5"><span class="dice-md">⚄</span><span class="reward-text">x180</span></div>
+                            <div class="option-box" onclick="predict('TRIPLE_6')" id="btn-TRIPLE_6"><span class="dice-md">⚅</span><span class="reward-text">x180</span></div>
+                            
+                            <div class="option-box" onclick="predict('DOUBLE_1')" id="btn-DOUBLE_1"><span class="dice-md">⚀⚀</span><span class="reward-text">x10</span></div>
+                            <div class="option-box" onclick="predict('DOUBLE_2')" id="btn-DOUBLE_2"><span class="dice-md">⚁⚁</span><span class="reward-text">x10</span></div>
+                            <div class="option-box" onclick="predict('DOUBLE_3')" id="btn-DOUBLE_3"><span class="dice-md">⚂⚂</span><span class="reward-text">x10</span></div>
+                            <div class="option-box" onclick="predict('DOUBLE_4')" id="btn-DOUBLE_4"><span class="dice-md">⚃⚃</span><span class="reward-text">x10</span></div>
+                            <div class="option-box" onclick="predict('DOUBLE_5')" id="btn-DOUBLE_5"><span class="dice-md">⚄⚄</span><span class="reward-text">x10</span></div>
+                            <div class="option-box" onclick="predict('DOUBLE_6')" id="btn-DOUBLE_6"><span class="dice-md">⚅⚅</span><span class="reward-text">x10</span></div>
+                        </div>
+                        <div class="option-box side-box big" onclick="predict('BIG')" id="btn-BIG"><h1>BIG</h1><div class="rule-text">11-17</div><div class="reward-text">x1</div></div>
+                    </div>
+
+                    <div class="totals-row">
+                        <div class="option-box total-item" onclick="predict('TOTAL_4')" id="btn-TOTAL_4"><span class="total-num">4</span><span class="reward-text">x60</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_5')" id="btn-TOTAL_5"><span class="total-num">5</span><span class="reward-text">x30</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_6')" id="btn-TOTAL_6"><span class="total-num">6</span><span class="reward-text">x18</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_7')" id="btn-TOTAL_7"><span class="total-num">7</span><span class="reward-text">x12</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_8')" id="btn-TOTAL_8"><span class="total-num">8</span><span class="reward-text">x8</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_9')" id="btn-TOTAL_9"><span class="total-num">9</span><span class="reward-text">x6</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_10')" id="btn-TOTAL_10"><span class="total-num">10</span><span class="reward-text">x6</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_11')" id="btn-TOTAL_11"><span class="total-num">11</span><span class="reward-text">x6</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_12')" id="btn-TOTAL_12"><span class="total-num">12</span><span class="reward-text">x6</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_13')" id="btn-TOTAL_13"><span class="total-num">13</span><span class="reward-text">x8</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_14')" id="btn-TOTAL_14"><span class="total-num">14</span><span class="reward-text">x12</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_15')" id="btn-TOTAL_15"><span class="total-num">15</span><span class="reward-text">x18</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_16')" id="btn-TOTAL_16"><span class="total-num">16</span><span class="reward-text">x30</span></div>
+                        <div class="option-box total-item" onclick="predict('TOTAL_17')" id="btn-TOTAL_17"><span class="total-num">17</span><span class="reward-text">x60</span></div>
+                    </div>
+
+                    <div class="combos-row">
+                        <div class="row-label"><div class="main-text">TWO</div><div class="reward-text">x5</div></div>
+                        <div class="combo-grid">
+                            <div class="option-box" onclick="predict('COMBO_1_2')" id="btn-COMBO_1_2"><div class="domino"><span class="dice-sm">⚀</span><span class="dice-sm">⚁</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_1_3')" id="btn-COMBO_1_3"><div class="domino"><span class="dice-sm">⚀</span><span class="dice-sm">⚂</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_1_4')" id="btn-COMBO_1_4"><div class="domino"><span class="dice-sm">⚀</span><span class="dice-sm">⚃</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_1_5')" id="btn-COMBO_1_5"><div class="domino"><span class="dice-sm">⚀</span><span class="dice-sm">⚄</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_1_6')" id="btn-COMBO_1_6"><div class="domino"><span class="dice-sm">⚀</span><span class="dice-sm">⚅</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_2_3')" id="btn-COMBO_2_3"><div class="domino"><span class="dice-sm">⚁</span><span class="dice-sm">⚂</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_2_4')" id="btn-COMBO_2_4"><div class="domino"><span class="dice-sm">⚁</span><span class="dice-sm">⚃</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_2_5')" id="btn-COMBO_2_5"><div class="domino"><span class="dice-sm">⚁</span><span class="dice-sm">⚄</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_2_6')" id="btn-COMBO_2_6"><div class="domino"><span class="dice-sm">⚁</span><span class="dice-sm">⚅</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_3_4')" id="btn-COMBO_3_4"><div class="domino"><span class="dice-sm">⚂</span><span class="dice-sm">⚃</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_3_5')" id="btn-COMBO_3_5"><div class="domino"><span class="dice-sm">⚂</span><span class="dice-sm">⚄</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_3_6')" id="btn-COMBO_3_6"><div class="domino"><span class="dice-sm">⚂</span><span class="dice-sm">⚅</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_4_5')" id="btn-COMBO_4_5"><div class="domino"><span class="dice-sm">⚃</span><span class="dice-sm">⚄</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_4_6')" id="btn-COMBO_4_6"><div class="domino"><span class="dice-sm">⚃</span><span class="dice-sm">⚅</span></div></div>
+                            <div class="option-box" onclick="predict('COMBO_5_6')" id="btn-COMBO_5_6"><div class="domino"><span class="dice-sm">⚄</span><span class="dice-sm">⚅</span></div></div>
+                        </div>
+                    </div>
+
+                    <div class="singles-row">
+                        <div class="row-label"><div class="main-text">ONE</div><div class="reward-text">x1~3</div></div>
+                        <div class="singles-grid">
+                            <div class="option-box single-box" onclick="predict('SINGLE_1')" id="btn-SINGLE_1"><span class="dice-lg">⚀</span></div>
+                            <div class="option-box single-box" onclick="predict('SINGLE_2')" id="btn-SINGLE_2"><span class="dice-lg">⚁</span></div>
+                            <div class="option-box single-box" onclick="predict('SINGLE_3')" id="btn-SINGLE_3"><span class="dice-lg">⚂</span></div>
+                            <div class="option-box single-box" onclick="predict('SINGLE_4')" id="btn-SINGLE_4"><span class="dice-lg">⚃</span></div>
+                            <div class="option-box single-box" onclick="predict('SINGLE_5')" id="btn-SINGLE_5"><span class="dice-lg">⚄</span></div>
+                            <div class="option-box single-box" onclick="predict('SINGLE_6')" id="btn-SINGLE_6"><span class="dice-lg">⚅</span></div>
+                        </div>
+                    </div>
+
+                    <div class="bottom-controls">
+                        <div class="point-selector">
+                            <div class="point-token selected" onclick="setPoint(1000, this)">1,000</div>
+                            <div class="point-token" onclick="setPoint(5000, this)">5,000</div>
+                            <div class="point-token" onclick="setPoint(10000, this)">10K</div>
+                            <div class="point-token" onclick="setPoint(50000, this)">50K</div>
+                            <div class="point-token" onclick="setPoint(100000, this)">100K</div>
+                        </div>
+                        <button class="btn btn-clear" onclick="clearPredictions()">RESET</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="side-panel" id="rankingPanel">
+                <div class="toggle-btn ranking-toggle-btn" onclick="togglePanel('rankingPanel', 'gameContainer', 'right')">▶</div>
+                <div class="panel-content">
+                    <div class="panel-title">TOP RANKING</div>
+                    <div class="scroll-list" id="rankingList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="ad-vertical-container"><div class="ad-space ad-vertical">AD AREA</div></div>
+    </div>
+
+    <div class="ad-bottom-container"><div class="ad-space ad-horizontal">AD AREA</div></div>
+
+<div id="disclaimer-modal" class="show">
+    <div class="modal-box">
+        <div class="disclaimer-title">NOTICE</div>
+        <div class="disclaimer-text">
+            본 서비스는 오락 목적의 단순 게임입니다.<br><br>
+            • 게임 내 포인트는 현금 가치가 없습니다.<br>
+            • 포인트는 환전, 양도, 거래가 불가능합니다.<br>
+            • 어떠한 형태의 금전적 보상도 제공하지 않습니다.
+        </div>
+        <button class="action-btn" onclick="closeDisclaimer()">I UNDERSTAND</button>
+    </div>
+</div>
+
+<div id="nickname-modal">
+    <div class="modal-box">
+        <h2 style="color:var(--text-gold); margin-top:0;">NICKNAME</h2>
+        <input type="text" id="nick-input" class="nick-input" placeholder="Your Name" maxlength="8">
+        <button class="action-btn" onclick="submitNickname()">SAVE NAME</button>
+    </div>
+</div>
+
+<div id="toast-warning"></div>
+
+<script>
+    let USER_ID = localStorage.getItem('sicbo_uid');
+    if (!USER_ID) {
+        USER_ID = 'player_' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('sicbo_uid', USER_ID);
+    }
+
+    let currentPoint = 1000; // currentChip -> currentPoint
+    let myPredictions = {}; // myBets -> myPredictions
+    let localScore = 0; // localBalance -> localScore
+    let currentState = ""; 
+    const diceChars = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+    let isProcessing = false;
+    let myNickname = null;
+
+    setInterval(fetchGameStatus, 200);
+
+    // [LEGAL_SAFE_FIX] 고지사항 닫기
+    function closeDisclaimer() {
+        document.getElementById('disclaimer-modal').classList.remove('show');
+        // 닉네임 확인 로직 트리거
+        checkNicknameNeeded();
+    }
+
+    async function fetchGameStatus() {
+        try {
+            const res = await fetch(`/status?uid=${USER_ID}`);
+            const data = await res.json();
+            
+            myNickname = data.nickname;
+            document.getElementById('my-nickname').innerText = (myNickname || "Guest") + " 🖊️";
+
+            if (!isProcessing) {
+                localScore = data.score; 
+            }
+            updateUI(data);
+        } catch(e) { console.error(e); }
+    }
+
+    function checkNicknameNeeded() {
+        if ((!myNickname || myNickname === 'Guest') && !document.getElementById('nickname-modal').classList.contains('hidden-by-user')) {
+            document.getElementById('nickname-modal').classList.add('show');
+        }
+    }
+
+    async function submitNickname() {
+        const input = document.getElementById('nick-input');
+        const newNick = input.value.trim();
+        if (!newNick) return showWarning("닉네임을 입력하세요.");
+
+        const res = await fetch('/user/nickname', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ uid: USER_ID, nickname: newNick })
+        });
+        const result = await res.json();
+        
+        if (result.success) {
+            document.getElementById('nickname-modal').classList.remove('show');
+            document.getElementById('nickname-modal').classList.add('hidden-by-user');
+            showWarning("닉네임이 변경되었습니다.");
+        }
+    }
+
+    function openNickModal() {
+        document.getElementById('nickname-modal').classList.add('show');
+    }
+
+    function updateUI(data) {
+        const statusEl = document.getElementById('game-status-bar');
+        
+        // [LEGAL_SAFE_FIX] 상태 메시지 변경
+        if(data.state === 'SELECTION') {
+            statusEl.innerText = `SELECT: ${data.timer}s`;
+            statusEl.style.color = "#00ffcc";
+        } else if(data.state === 'RESULT') {
+            statusEl.innerText = `RESULT: ${data.timer}s`;
+            statusEl.style.color = "#ff3366";
+        }
+        
+        currentState = data.state;
+        document.getElementById('points').innerText = formatPoints(localScore);
+        
+        if (!isProcessing) {
+            myPredictions = data.my_selections;
+            renderPredictions(myPredictions);
+        }
+        
+        renderHistory(data.history);
+        renderRanking(data.ranking);
+
+        const winEl = document.getElementById('win-amount');
+        const resultVal = data.round_result || 0;
+        
+        // [LEGAL_SAFE_FIX] 결과 표시: +PT / -PT
+        if (resultVal > 0) {
+            winEl.innerText = "+" + formatPoints(resultVal);
+            winEl.style.color = "#00ffcc";
+        } else if (resultVal < 0) {
+            winEl.innerText = formatPoints(resultVal);
+            winEl.style.color = "#ff3366";
+        } else {
+            winEl.innerText = "0";
+            winEl.style.color = "#fff";
+        }
+
+        const box = document.querySelector('.static-dice-container');
+        if(data.state === 'RESULT') {
+            let html = '';
+            data.dice.forEach(d => {
+                html += `<div class="die-3d">${diceChars[d-1]}</div>`;
+            });
+            box.innerHTML = html;
+        } else {
+            box.innerHTML = `<div class="die-3d">?</div><div class="die-3d">?</div><div class="die-3d">?</div>`;
+        }
+        
+        document.querySelectorAll('.winner').forEach(el => el.classList.remove('winner'));
+        if(data.outcomes && data.outcomes.length > 0) {
+            data.outcomes.forEach(w => {
+                const btn = document.getElementById('btn-' + w);
+                if(btn) btn.classList.add('winner');
+            });
+        }
+    }
+
+    function renderRanking(ranking) {
+        const listEl = document.getElementById('rankingList');
+        if (!ranking) return;
+        let html = '';
+        ranking.forEach((user, index) => {
+            const isMe = user.uid === USER_ID ? 'rank-me' : '';
+            html += `<div class="ranking-item ${isMe}"><div class="rank-rank">${index + 1}</div><div class="rank-user">${user.nickname}</div><div class="rank-bal">${formatPoints(user.score)}</div></div>`;
+        });
+        listEl.innerHTML = html;
+    }
+
+    function togglePanel(panelId, containerId, side) {
+        const panel = document.getElementById(panelId);
+        const btn = panel.querySelector('.toggle-btn');
+        panel.classList.toggle('collapsed');
+        if (side === 'left') btn.innerText = panel.classList.contains('collapsed') ? '▶' : '◀';
+        else btn.innerText = panel.classList.contains('collapsed') ? '◀' : '▶';
+    }
+
+    // [LEGAL_SAFE_FIX] bet -> predict
+    async function predict(type) {
+        const statusText = document.getElementById('game-status-bar').innerText;
+        if(!statusText.includes("SELECT")) return showWarning("선택 시간이 아닙니다.");
+        if(localScore < currentPoint) return showWarning("포인트가 부족합니다.");
+
+        isProcessing = true;
+        localScore -= currentPoint;
+        document.getElementById('points').innerText = formatPoints(localScore);
+        
+        if(!myPredictions[type]) myPredictions[type] = 0;
+        myPredictions[type] += currentPoint;
+        renderPredictions(myPredictions);
+
+        try {
+            const res = await fetch('/predict', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ uid: USER_ID, prediction_type: type, points: currentPoint })
+            });
+            const result = await res.json();
+            if(!result.success) {
+                showWarning(result.msg);
+                isProcessing = false;
+                fetchGameStatus(); 
+            } else {
+                setTimeout(() => { isProcessing = false; }, 300);
+            }
+        } catch(e) { isProcessing = false; }
+    }
+
+    async function clearPredictions() {
+        const statusText = document.getElementById('game-status-bar').innerText;
+        if(!statusText.includes("SELECT")) return showWarning("취소할 수 없습니다.");
+        isProcessing = true;
+        myPredictions = {};
+        renderPredictions(myPredictions);
+        try {
+            const res = await fetch('/predict/clear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ uid: USER_ID })
+            });
+            const result = await res.json();
+            if(result.success) {
+                isProcessing = false;
+                fetchGameStatus();
+            } else {
+                showWarning(result.msg);
+                isProcessing = false;
+            }
+        } catch(e) { isProcessing = false; }
+    }
+
+    // [LEGAL_SAFE_FIX] 금액 표기 제거 (k단위 대신 콤마)
+    function formatPoints(num) { 
+        return num.toLocaleString(); 
+    }
+
+    function renderPredictions(predictions) {
+        document.querySelectorAll('.point-badge').forEach(e => e.remove());
+        document.querySelectorAll('.active').forEach(e => e.classList.remove('active'));
+        if(!predictions) return;
+        for(const [type, points] of Object.entries(predictions)) {
+            const btn = document.getElementById('btn-' + type);
+            if(btn) {
+                btn.classList.add('active');
+                const badge = document.createElement('div');
+                badge.className = 'point-badge';
+                // 1000 -> 1k 표기는 공간 문제로 유지하되 의미는 점수임
+                badge.innerText = (points >= 1000 ? (points/1000) + 'k' : points);
+                btn.appendChild(badge);
+            }
+        }
+    }
+
+    function renderHistory(history) {
+        const listEl = document.getElementById('historyList');
+        if(!history || listEl.childElementCount === history.length) return; 
+        listEl.innerHTML = "";
+        history.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            let diceHtml = `<div class="h-dice-group">`;
+            item.dice.forEach(d => { diceHtml += `<span class="h-die">${diceChars[d-1]}</span>`; });
+            diceHtml += `</div>`;
+            div.innerHTML = diceHtml;
+            listEl.appendChild(div);
+        });
+    }
+
+    function setPoint(val, el) {
+        currentPoint = val;
+        document.querySelectorAll('.point-token').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+
+    function showWarning(msg) {
+        const toast = document.getElementById('toast-warning');
+        toast.innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => { toast.classList.remove('show'); }, 2000);
+    }
+</script>
+
+</body>
+</html>
