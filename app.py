@@ -6,7 +6,7 @@ import re
 import html
 import uuid
 import secrets
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 
 # [LEGAL_SAFE_FIX] 7) 운영 배포 안전성: 디버그 모드 환경변수 제어 및 로깅 설정
 # 실제 운영 시에는 FLASK_ENV=production으로 설정해야 합니다.
