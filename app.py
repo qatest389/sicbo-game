@@ -1,4 +1,3 @@
-import threading
 import time
 import random
 import os
@@ -6,6 +5,7 @@ import re
 import html
 import uuid
 import secrets
+import threading
 from flask import Flask, jsonify, request, render_template, make_response
 
 # 운영 환경 설정
@@ -26,6 +26,7 @@ try:
 except Exception as e:
     print(f"⚠️ [메모리 모드] 에러: {e}")
 
+# 동시성 제어를 위한 락 (여전히 필요함)
 game_lock = threading.Lock()
 session_store = {}
 
@@ -42,9 +43,9 @@ app = Flask(__name__)
 class GameEngine:
     def __init__(self):
         self.state = 'SELECTION'
-        # [FIX] 절대 시간 로직 도입
         self.duration = 15
-        self.end_time = time.time() + self.duration # 목표 시간 설정
+        # 서버 시작 시점 기준으로 목표 시간 설정
+        self.end_time = time.time() + self.duration 
         
         self.dice = [1, 1, 1]
         self.sum_val = 3
@@ -55,25 +56,21 @@ class GameEngine:
         self.cached_ranking = []
         self.update_ranking_logic()
 
-    def game_loop(self):
+    # [FIX] 백그라운드 루프(Thread) 삭제 -> 요청 시 업데이트 방식으로 변경
+    def check_state_update(self):
         """
-        [FIX] sleep(1) 카운트 다운 방식 폐기 -> 절대 시간 비교 방식
+        클라이언트가 상태를 요청할 때마다 호출됨.
+        시간이 다 되었는지 확인하고, 다 되었으면 다음 상태로 전이.
         """
-        print("🚀 [SYSTEM] Game Loop Started (Absolute Time Mode)")
-        while True:
-            time.sleep(0.5) # 0.5초마다 체크 (반응 속도 향상)
-            
-            try:
-                now = time.time()
-                # 목표 시간이 지났으면 다음 단계로 넘어감
-                if now >= self.end_time:
-                    with game_lock:
-                        self.next_state()
-            except Exception as e:
-                print(f"🚨 [CRITICAL ERROR] Loop crashed: {e}")
+        now = time.time()
+        if now >= self.end_time:
+            with game_lock:
+                # 락을 얻고 나서 한 번 더 확인 (동시성 이슈 방지)
+                if time.time() >= self.end_time:
+                    self.next_state()
 
     def get_remaining_time(self):
-        # 남은 시간 = 목표 시간 - 현재 시간
+        self.check_state_update() # 시간 확인 먼저 수행
         remaining = int(self.end_time - time.time())
         return max(0, remaining)
 
@@ -252,10 +249,8 @@ class GameEngine:
                     memory_db['users'][uid]['nickname'] = nickname
             self.update_ranking_logic()
 
-# 게임 엔진 시작
+# 게임 엔진 초기화 (스레드 시작 안함)
 game = GameEngine()
-t = threading.Thread(target=game.game_loop, daemon=True)
-t.start()
 
 # --- 인증/보안 ---
 def generate_session_token(uid):
@@ -310,6 +305,9 @@ def get_status():
     my_selections = {}
     round_result = 0
     
+    # [FIX] 상태 업데이트 확인 (요청이 들어올 때 시간 체크)
+    remaining_time = game.get_remaining_time()
+
     if uid:
         try:
             user_data = game.get_user_data(uid)
@@ -329,12 +327,9 @@ def get_status():
         display_sum = game.sum_val
         display_outcomes = game.round_outcomes
 
-    # [FIX] 계산된 남은 시간을 반환
-    remaining_time = game.get_remaining_time()
-
     resp = make_response(jsonify({
         'state': game.state,
-        'timer': remaining_time, # 변수값이 아닌 계산값 전달
+        'timer': remaining_time,
         'dice': display_dice,
         'sum': display_sum,
         'outcomes': display_outcomes,
@@ -353,6 +348,9 @@ def get_status():
 def make_prediction():
     uid = get_uid_from_request()
     if not uid: return jsonify({'success': False, 'msg': '로그인이 필요합니다.'}), 401
+
+    # [FIX] 베팅 전에도 상태 업데이트 체크
+    game.check_state_update()
 
     with game_lock:
         if game.state != 'SELECTION': 
@@ -387,6 +385,8 @@ def make_prediction():
 def clear_predictions():
     uid = get_uid_from_request()
     if not uid: return jsonify({'success': False, 'msg': '로그인 필요'}), 401
+
+    game.check_state_update()
 
     with game_lock:
         if game.state != 'SELECTION': 
