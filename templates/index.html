@@ -170,14 +170,13 @@
         .nickname-display { font-size: 1.1rem; color: #ffffff; cursor: pointer; font-weight: bold; text-decoration: none; margin-bottom: 5px; }
         .nickname-display:hover { color: #cccccc; }
 
-        /* [NEW] 심플한 무료 충전 UI */
         #free-charge-panel {
             position: absolute;
             bottom: 20px; right: 20px;
             background: rgba(16, 16, 30, 0.95);
             border: 2px solid var(--text-gold);
             padding: 15px; border-radius: 12px;
-            display: none; /* JS로 제어 */
+            display: none; 
             flex-direction: column; align-items: center;
             box-shadow: 0 0 15px rgba(233, 69, 96, 0.3);
             z-index: 4000;
@@ -386,7 +385,7 @@
             <h3>⚡ 무료 충전소</h3>
             <ul>
                 <li>보유 점수가 <strong>1,000점 이하</strong>일 때 활성화됩니다.</li>
-                <li>버튼을 누르면 즉시 <strong>100,000점</strong>을 무료로 드립니다.</li>
+                <li>라운드당 1회, 즉시 <strong>100,000점</strong>을 무료로 드립니다.</li>
             </ul>
 
             <h3>🏆 점수 획득 배율</h3>
@@ -476,10 +475,11 @@
         } catch(e) { console.error(e); }
     }
     
-    // [NEW] 단순화된 무료 충전 로직
-    function updateFreeChargeUI() {
+    // [NEW] 무료 충전 UI (1판 1회 제한 반영)
+    function updateFreeChargeUI(data) {
         const panel = document.getElementById('free-charge-panel');
-        if (localScore <= 1000) {
+        // 점수 1000 이하 AND 이번 판에 아직 안 받았을 때만 표시
+        if (data.score <= 1000 && !data.already_claimed) {
             panel.style.display = 'flex';
         } else {
             panel.style.display = 'none';
@@ -594,7 +594,7 @@
             });
         }
 
-        updateFreeChargeUI();
+        updateFreeChargeUI(data);
     }
 
     function renderRanking(ranking) {

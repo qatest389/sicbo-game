@@ -36,7 +36,10 @@ class GameEngine:
     def __init__(self):
         self.state = 'SELECTION'
         self.duration = 15
-        self.end_time = time.time() + self.duration 
+        self.end_time = time.time() + self.duration
+        
+        # [NEW] 라운드 ID 추가 (게임 회차 관리)
+        self.round_id = 1
         
         self.dice = [1, 1, 1]
         self.sum_val = 3
@@ -67,10 +70,15 @@ class GameEngine:
             self.roll_dice_logic()
             self.process_rewards()
             self.update_ranking_logic()
+            
         elif self.state == 'RESULT':
             self.state = 'SELECTION'
             self.duration = 15
             self.end_time = time.time() + self.duration
+            
+            # [NEW] 새 라운드 시작 시 라운드 ID 증가
+            self.round_id += 1
+            
             self.current_predictions = {}
             self.round_outcomes = []
             self.last_round_delta = {} 
@@ -165,7 +173,14 @@ class GameEngine:
                 self.update_user_stats(uid, 0, is_win=False)
 
     def get_user_data(self, uid):
-        default_data = {'score': 1000000, 'nickname': 'Guest', 'plays': 0, 'max_record': 0}
+        # [NEW] last_claim_round 추가
+        default_data = {
+            'score': 1000000, 
+            'nickname': 'Guest', 
+            'plays': 0, 
+            'max_record': 0,
+            'last_claim_round': 0 
+        }
         if db:
             try:
                 doc = db.collection('users').document(uid).get()
@@ -211,21 +226,29 @@ class GameEngine:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
     
-    # [FIX] 즉시 10만 점수 지급 로직 (시간 계산 제거)
+    # [FIX] 1라운드 1회 수령 로직 적용
     def claim_free_score(self, uid):
         with game_lock:
             data = self.get_user_data(uid)
             current_score = data.get('score', 0)
+            last_round = data.get('last_claim_round', 0)
             
-            # 1000점 이하 확인
+            # 1. 점수 조건 확인
             if current_score > 1000:
                 return 0, "보유 점수가 1,000점 이하일 때만 가능합니다."
             
-            # 즉시 10만점 지급
+            # 2. 이번 라운드 수령 여부 확인
+            if last_round == self.round_id:
+                return 0, "이번 라운드에는 이미 받았습니다. 다음 판을 기다려주세요."
+
+            # 즉시 10만점 지급 및 라운드 기록
             add_score = 100000
             new_score = current_score + add_score
             
-            update_payload = {'score': new_score}
+            update_payload = {
+                'score': new_score, 
+                'last_claim_round': self.round_id  # 현재 라운드 ID 기록
+            }
             
             if db:
                 db.collection('users').document(uid).update(update_payload)
@@ -301,6 +324,9 @@ def get_status():
     my_nick = "Guest"
     my_selections = {}
     round_result = 0
+    
+    # [NEW] 이미 받았는지 여부 전달
+    already_claimed = False 
     remaining_time = game.get_remaining_time()
 
     if uid:
@@ -308,6 +334,12 @@ def get_status():
             user_data = game.get_user_data(uid)
             current_score = user_data.get('score', 0)
             my_nick = user_data.get('nickname', 'Guest')
+            
+            # [CHECK] DB에 저장된 마지막 받은 라운드가 == 현재 게임 라운드면 True
+            last_round = user_data.get('last_claim_round', 0)
+            if last_round == game.round_id:
+                already_claimed = True
+                
             my_selections = game.current_predictions.get(uid, {})
             round_result = game.last_round_delta.get(uid, 0)
         except:
@@ -331,6 +363,7 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
+        'already_claimed': already_claimed, # 클라이언트로 전송
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
