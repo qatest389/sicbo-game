@@ -170,6 +170,7 @@
         .nickname-display { font-size: 1.1rem; color: #ffffff; cursor: pointer; font-weight: bold; text-decoration: none; margin-bottom: 5px; }
         .nickname-display:hover { color: #cccccc; }
 
+        /* 무료 점수 충전 UI */
         #free-charge-panel {
             position: absolute;
             bottom: 20px; right: 20px;
@@ -501,7 +502,8 @@
             panel.style.display = 'flex';
             
             const now = Date.now() / 1000;
-            const elapsed = now - lastClaimTs;
+            let elapsed = now - lastClaimTs;
+            if (elapsed < 0) elapsed = 0; 
             
             let accumulated = Math.floor(elapsed / 30) * 1000;
             if (accumulated > 5000) accumulated = 5000;
@@ -560,23 +562,29 @@
         const newNick = input.value.trim();
         if (!newNick) return showWarning("닉네임을 입력하세요.");
 
-        const res = await fetch('/user/nickname', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + SESSION_TOKEN
-            },
-            body: JSON.stringify({ nickname: newNick })
-        });
-        const result = await res.json();
-        
-        if (result.success) {
-            document.getElementById('nickname-modal').classList.remove('show');
-            document.getElementById('nickname-modal').classList.add('hidden-by-user');
-            showWarning("닉네임이 변경되었습니다.");
-        } else {
-            showWarning(result.msg);
-        }
+        // [Optimistic Update] UI 먼저 반영 및 창 닫기
+        document.getElementById('nickname-modal').classList.remove('show');
+        document.getElementById('nickname-modal').classList.add('hidden-by-user');
+        document.getElementById('my-nickname').innerText = newNick;
+
+        try {
+            const res = await fetch('/user/nickname', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + SESSION_TOKEN
+                },
+                body: JSON.stringify({ nickname: newNick })
+            });
+            const result = await res.json();
+            
+            if (result.success) {
+                showWarning("닉네임이 변경되었습니다.");
+            } else {
+                showWarning(result.msg);
+                // 실패 시 롤백하거나 다시 열어줄 수 있음
+            }
+        } catch(e) { console.error(e); }
     }
 
     function openNickModal() {
