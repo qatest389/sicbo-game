@@ -223,12 +223,12 @@ class GameEngine:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
     
-    # [FIX] 무료 점수 지급 로직
     def claim_free_score(self, uid):
         with game_lock:
             data = self.get_user_data(uid)
             current_score = data.get('score', 0)
             
+            # 보유 점수가 1000점 이하일 때만 가능 (여유있게 1000 포함)
             if current_score > 1000:
                 return 0, "보유 점수가 1,000점 이하일 때만 가능합니다."
             
@@ -236,6 +236,11 @@ class GameEngine:
             now = time.time()
             elapsed = now - last_ts
             
+            # [FIX] 시간이 꼬여서 마이너스가 나오면 리셋
+            if elapsed < 0:
+                last_ts = now
+                elapsed = 0
+                
             intervals = int(elapsed // 30)
             add_score = intervals * 1000
             
@@ -244,7 +249,7 @@ class GameEngine:
             
             new_score = current_score + add_score
             
-            # 시간 보존 처리
+            # [FIX] 시간 보존 처리 (남은 초는 살려둠)
             if add_score >= 5000:
                 new_last_ts = now
             else:
@@ -274,14 +279,15 @@ class GameEngine:
                     memory_db['users'][uid]['nickname'] = nickname
             self.update_ranking_logic()
 
-    # [NEW] 무료 정보 계산 (서버 사이드 계산)
+    # [FIX] 서버가 직접 계산해서 클라이언트에 줌 (시간 오류 원천 차단)
     def calculate_free_info(self, uid):
         data = self.get_user_data(uid)
         last_ts = data.get('last_claim_ts', time.time())
         now = time.time()
         elapsed = now - last_ts
         
-        if elapsed < 0: elapsed = 0 # 미래 시간 방어
+        if elapsed < 0: # 시간이 꼬였으면 0으로 처리
+            elapsed = 0
         
         accumulated = int(elapsed // 30) * 1000
         if accumulated > 5000: accumulated = 5000
@@ -348,7 +354,7 @@ def get_status():
     my_selections = {}
     round_result = 0
     
-    # [NEW] 무료 충전 정보 변수
+    # [FIX] 서버에서 계산된 값 변수
     free_accumulated = 0
     free_countdown = 30
     
@@ -362,7 +368,7 @@ def get_status():
             my_selections = game.current_predictions.get(uid, {})
             round_result = game.last_round_delta.get(uid, 0)
             
-            # [NEW] 서버에서 직접 계산해서 전달
+            # [FIX] 점수가 1000 이하면 서버에서 계산해서 전달
             if current_score <= 1000:
                 free_accumulated, free_countdown = game.calculate_free_info(uid)
         except:
@@ -386,7 +392,7 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
-        # [NEW] 클라이언트는 이 값만 보여주면 됨
+        # [FIX] 계산된 정보를 바로 보냄
         'free_info': {
             'accumulated': free_accumulated,
             'countdown': free_countdown

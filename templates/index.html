@@ -596,19 +596,17 @@
             });
         }
 
-        // [NEW] 무료 점수 UI 업데이트 (서버 데이터 바인딩)
+        // [FIX] 서버 데이터를 그대로 표시 (계산 로직 제거)
         const panel = document.getElementById('free-charge-panel');
         if (data.score <= 1000 && data.free_info) {
             panel.style.display = 'flex';
             const acc = data.free_info.accumulated;
             const cnt = data.free_info.countdown;
             
-            // 게이지 바
             const pct = (acc / 5000) * 100;
             document.getElementById('free-charge-fill').style.width = pct + '%';
             document.getElementById('free-charge-text').innerText = `${acc.toLocaleString()} / 5,000`;
             
-            // 타이머
             const timerEl = document.getElementById('free-charge-timer');
             if (acc >= 5000) {
                 timerEl.innerText = "MAX REACHED";
@@ -616,9 +614,8 @@
                 timerEl.innerText = `다음 충전: ${cnt}초`;
             }
             
-            // 버튼 활성화
             const btn = document.getElementById('btn-claim-score');
-            if (acc >= 1000) {
+            if (acc >= 1000) { // 1000점 이상이면 활성화
                 btn.disabled = false;
                 btn.style.background = "#00ffcc";
             } else {
