@@ -42,7 +42,10 @@ app = Flask(__name__)
 class GameEngine:
     def __init__(self):
         self.state = 'SELECTION'
-        self.timer = 15
+        # [FIX] 절대 시간 로직 도입
+        self.duration = 15
+        self.end_time = time.time() + self.duration # 목표 시간 설정
+        
         self.dice = [1, 1, 1]
         self.sum_val = 3
         self.history = []
@@ -50,41 +53,45 @@ class GameEngine:
         self.round_outcomes = [] 
         self.last_round_delta = {} 
         self.cached_ranking = []
-        
-        # 서버 시작 시 초기 랭킹 로드
         self.update_ranking_logic()
 
     def game_loop(self):
         """
-        [FIX] 로그 출력 및 에러 방어 코드
+        [FIX] sleep(1) 카운트 다운 방식 폐기 -> 절대 시간 비교 방식
         """
-        print("🚀 [SYSTEM] Game Loop Started!")
+        print("🚀 [SYSTEM] Game Loop Started (Absolute Time Mode)")
         while True:
-            time.sleep(1) # 1초 대기
+            time.sleep(0.5) # 0.5초마다 체크 (반응 속도 향상)
             
             try:
-                with game_lock:
-                    self.timer -= 1
-                    # [DEBUG] 로그에 시간 출력 (Render Logs에서 확인 가능)
-                    if self.timer % 5 == 0: 
-                        print(f"⏱️ [TIMER] State: {self.state}, Time: {self.timer}")
-
-                    if self.timer <= 0:
+                now = time.time()
+                # 목표 시간이 지났으면 다음 단계로 넘어감
+                if now >= self.end_time:
+                    with game_lock:
                         self.next_state()
             except Exception as e:
                 print(f"🚨 [CRITICAL ERROR] Loop crashed: {e}")
 
+    def get_remaining_time(self):
+        # 남은 시간 = 목표 시간 - 현재 시간
+        remaining = int(self.end_time - time.time())
+        return max(0, remaining)
+
     def next_state(self):
         if self.state == 'SELECTION':
             self.state = 'RESULT' 
-            self.timer = 5 
+            self.duration = 5
+            self.end_time = time.time() + self.duration
+            
             self.roll_dice_logic()
             self.process_rewards()
             self.update_ranking_logic()
             
         elif self.state == 'RESULT':
             self.state = 'SELECTION'
-            self.timer = 15 
+            self.duration = 15
+            self.end_time = time.time() + self.duration
+            
             self.current_predictions = {}
             self.round_outcomes = []
             self.last_round_delta = {} 
@@ -322,10 +329,12 @@ def get_status():
         display_sum = game.sum_val
         display_outcomes = game.round_outcomes
 
-    # [FIX] 캐시 방지 헤더 추가
+    # [FIX] 계산된 남은 시간을 반환
+    remaining_time = game.get_remaining_time()
+
     resp = make_response(jsonify({
         'state': game.state,
-        'timer': game.timer,
+        'timer': remaining_time, # 변수값이 아닌 계산값 전달
         'dice': display_dice,
         'sum': display_sum,
         'outcomes': display_outcomes,
