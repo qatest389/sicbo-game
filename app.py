@@ -223,13 +223,12 @@ class GameEngine:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
     
-    # [FIX] 무료 점수 지급 로직 개선 (시간 보존)
+    # [FIX] 무료 점수 지급 로직
     def claim_free_score(self, uid):
         with game_lock:
             data = self.get_user_data(uid)
             current_score = data.get('score', 0)
             
-            # 보유 점수가 1000점 이하일 때만 (여유있게 1000 포함)
             if current_score > 1000:
                 return 0, "보유 점수가 1,000점 이하일 때만 가능합니다."
             
@@ -237,7 +236,6 @@ class GameEngine:
             now = time.time()
             elapsed = now - last_ts
             
-            # 30초당 1000점
             intervals = int(elapsed // 30)
             add_score = intervals * 1000
             
@@ -246,11 +244,11 @@ class GameEngine:
             
             new_score = current_score + add_score
             
-            # [FIX] 시간을 완전히 리셋하지 않고, 지급한 점수만큼의 시간만 더함 (나머지 초 보존)
+            # 시간 보존 처리
             if add_score >= 5000:
-                new_last_ts = now # 최대치면 현재 시간으로 리셋
+                new_last_ts = now
             else:
-                new_last_ts = last_ts + (intervals * 30) # 나머지 시간 보존
+                new_last_ts = last_ts + (intervals * 30)
             
             update_payload = {'score': new_score, 'last_claim_ts': new_last_ts}
             
@@ -275,6 +273,27 @@ class GameEngine:
                 else:
                     memory_db['users'][uid]['nickname'] = nickname
             self.update_ranking_logic()
+
+    # [NEW] 무료 정보 계산 (서버 사이드 계산)
+    def calculate_free_info(self, uid):
+        data = self.get_user_data(uid)
+        last_ts = data.get('last_claim_ts', time.time())
+        now = time.time()
+        elapsed = now - last_ts
+        
+        if elapsed < 0: elapsed = 0 # 미래 시간 방어
+        
+        accumulated = int(elapsed // 30) * 1000
+        if accumulated > 5000: accumulated = 5000
+        
+        # 남은 시간 계산
+        if accumulated >= 5000:
+            countdown = 0
+        else:
+            remainder = elapsed % 30
+            countdown = int(30 - remainder)
+            
+        return accumulated, countdown
 
 game = GameEngine()
 
@@ -328,7 +347,11 @@ def get_status():
     my_nick = "Guest"
     my_selections = {}
     round_result = 0
-    last_claim_ts = 0
+    
+    # [NEW] 무료 충전 정보 변수
+    free_accumulated = 0
+    free_countdown = 30
+    
     remaining_time = game.get_remaining_time()
 
     if uid:
@@ -336,9 +359,12 @@ def get_status():
             user_data = game.get_user_data(uid)
             current_score = user_data.get('score', 0)
             my_nick = user_data.get('nickname', 'Guest')
-            last_claim_ts = user_data.get('last_claim_ts', 0)
             my_selections = game.current_predictions.get(uid, {})
             round_result = game.last_round_delta.get(uid, 0)
+            
+            # [NEW] 서버에서 직접 계산해서 전달
+            if current_score <= 1000:
+                free_accumulated, free_countdown = game.calculate_free_info(uid)
         except:
             pass
 
@@ -360,7 +386,11 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
-        'last_claim_ts': last_claim_ts,
+        # [NEW] 클라이언트는 이 값만 보여주면 됨
+        'free_info': {
+            'accumulated': free_accumulated,
+            'countdown': free_countdown
+        },
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
