@@ -49,7 +49,7 @@
         }
 
         .ad-vertical-container {
-            width: 160px; /* PC 사이드바 너비 고정 */
+            width: 160px; 
             background: #0a0a12;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             flex-shrink: 0;
@@ -68,7 +68,7 @@
 
         /* --- [모바일 대응] --- */
         @media (max-width: 1024px) {
-            .ad-vertical-container { display: none; } /* 모바일에서 좌우 광고 숨김 */
+            .ad-vertical-container { display: none; } 
             .main-wrapper { padding: 5px; }
             .ad-top-container, .ad-bottom-container { min-height: 60px; }
         }
@@ -107,7 +107,7 @@
 
         .game-board-border { 
             width: 100%; max-width: 1000px;
-            height: 100%; max-height: 800px; 
+            height: 100%; max-height: 850px; /* 높이 약간 여유있게 */
             background: var(--board-color); padding: 10px; border-radius: 20px; 
             border: 4px solid var(--accent-color); 
             box-shadow: 0 0 40px rgba(0,0,0,0.5); 
@@ -158,11 +158,59 @@
         .total-item { justify-content: space-between; padding: 5px 0; background: rgba(255,255,255,0.03); }
         .total-num { font-size: 1.2rem; font-weight: bold; color: #fff; font-family: 'Roboto'; }
 
-        .combos-row { display: grid; grid-template-columns: 60px 1fr; gap: 0; height: 70px; margin-top: 2px; border: 1px solid rgba(255,255,255,0.1); }
-        .combo-grid { display: grid; grid-template-columns: repeat(15, 1fr); gap: 0; } 
+        /* --- [수정된 TWO (Combos) 영역] --- */
+        .combos-row { 
+            display: grid; 
+            grid-template-columns: 70px 1fr; 
+            gap: 0; 
+            min-height: 80px; /* 높이 여유 */
+            height: auto; 
+            margin-top: 2px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+        }
+        .combo-grid { 
+            display: flex; /* Flexbox로 변경하여 가운데 정렬 */
+            flex-wrap: wrap; /* 줄바꿈 허용 */
+            justify-content: center; /* 가로 가운데 정렬 */
+            align-items: center; /* 세로 가운데 정렬 */
+            gap: 5px; 
+            padding: 5px;
+        } 
+        .combo-grid .option-box {
+            flex: 0 0 auto;
+            padding: 8px;
+        }
 
-        .singles-row { display: grid; grid-template-columns: 60px 1fr; gap: 0; height: 80px; margin-top: -1px; border: 1px solid rgba(255,255,255,0.1); border-top: none; }
-        .singles-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; } 
+        /* --- [수정된 ONE (Singles) 영역] --- */
+        .singles-row { 
+            display: grid; 
+            grid-template-columns: 70px 1fr; 
+            gap: 0; 
+            min-height: 90px; 
+            height: auto; 
+            margin-top: -1px; 
+            border: 1px solid rgba(255,255,255,0.1); 
+            border-top: none; 
+        }
+        .singles-grid { 
+            display: flex; 
+            flex-wrap: wrap; 
+            justify-content: center; /* 가운데 정렬 */
+            align-items: center;
+            gap: 10px;
+            padding: 5px;
+        }
+        .single-box {
+            width: 80px; height: 80px; 
+        }
+
+        /* --- [주사위 사이즈 확대] --- */
+        .dice-lg { font-size: 3.5rem; line-height: 1; color: #fff; } 
+        .dice-md { font-size: 2.8rem; line-height: 1; color: #fff; } 
+        .dice-sm { font-size: 2.5rem; line-height: 1; color: #fff; } /* 대폭 확대 */
+        .domino { display: flex; gap: 5px; } /* 간격 조정 */
+        
+        .row-label { display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px solid rgba(255,255,255,0.1); color: var(--text-white); text-align: center; background: rgba(0,0,0,0.2); }
 
         .bottom-controls { margin-top: 5px; display: flex; justify-content: space-between; align-items: center; padding: 5px 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
         .point-selector { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
