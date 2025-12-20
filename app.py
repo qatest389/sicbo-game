@@ -8,6 +8,7 @@ import secrets
 import threading
 from flask import Flask, jsonify, request, render_template, make_response
 
+# 운영 환경 설정
 is_debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
 # --- [Firebase 설정] ---
@@ -28,6 +29,7 @@ except Exception as e:
 game_lock = threading.Lock()
 session_store = {}
 
+# 메모리 DB (Firebase 없을 때 사용)
 memory_db = { 'users': {} }
 
 app = Flask(__name__)
@@ -36,9 +38,9 @@ class GameEngine:
     def __init__(self):
         self.state = 'SELECTION'
         self.duration = 15
-        self.end_time = time.time() + self.duration
+        self.end_time = time.time() + self.duration 
         
-        # [NEW] 라운드 ID 추가 (게임 회차 관리)
+        # [핵심] 게임 라운드 번호 (서버 시작 시 1부터)
         self.round_id = 1
         
         self.dice = [1, 1, 1]
@@ -67,6 +69,7 @@ class GameEngine:
             self.state = 'RESULT' 
             self.duration = 5
             self.end_time = time.time() + self.duration
+            
             self.roll_dice_logic()
             self.process_rewards()
             self.update_ranking_logic()
@@ -76,7 +79,7 @@ class GameEngine:
             self.duration = 15
             self.end_time = time.time() + self.duration
             
-            # [NEW] 새 라운드 시작 시 라운드 ID 증가
+            # [핵심] 결과가 끝나고 다음 판(선택 시간)이 될 때 라운드 번호 증가
             self.round_id += 1
             
             self.current_predictions = {}
@@ -92,7 +95,9 @@ class GameEngine:
                     data = doc.to_dict()
                     nick = data.get('nickname', doc.id[:6])
                     ranking_list.append({
-                        'nickname': nick, 'score': data.get('score', 0), 'plays': data.get('plays', 0)
+                        'nickname': nick, 
+                        'score': data.get('score', 0),
+                        'plays': data.get('plays', 0)
                     })
             except Exception as e:
                 print(f"Ranking Error: {e}")
@@ -102,7 +107,9 @@ class GameEngine:
             for uid, data in sorted_users[:10]:
                 nick = data.get('nickname', uid[:6])
                 ranking_list.append({
-                    'nickname': nick, 'score': data.get('score', 0), 'plays': data.get('plays', 0)
+                    'nickname': nick, 
+                    'score': data.get('score', 0),
+                    'plays': data.get('plays', 0)
                 })
         self.cached_ranking = ranking_list
 
@@ -173,7 +180,7 @@ class GameEngine:
                 self.update_user_stats(uid, 0, is_win=False)
 
     def get_user_data(self, uid):
-        # [NEW] last_claim_round 추가
+        # last_claim_round: 마지막으로 무료 충전을 받은 라운드 번호
         default_data = {
             'score': 1000000, 
             'nickname': 'Guest', 
@@ -184,7 +191,12 @@ class GameEngine:
         if db:
             try:
                 doc = db.collection('users').document(uid).get()
-                if doc.exists: return doc.to_dict()
+                if doc.exists: 
+                    data = doc.to_dict()
+                    # DB에 필드가 없을 경우를 대비해 안전하게 확인
+                    if 'last_claim_round' not in data:
+                        data['last_claim_round'] = 0
+                    return data
                 else:
                     db.collection('users').document(uid).set(default_data)
                     return default_data
@@ -193,6 +205,8 @@ class GameEngine:
                 return default_data
         else:
             if uid not in memory_db['users']: memory_db['users'][uid] = default_data
+            if 'last_claim_round' not in memory_db['users'][uid]:
+                memory_db['users'][uid]['last_claim_round'] = 0
             return memory_db['users'][uid]
 
     def update_user_stats(self, uid, gained_points, is_win):
@@ -226,7 +240,7 @@ class GameEngine:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
     
-    # [FIX] 1라운드 1회 수령 로직 적용
+    # [FIX] 1라운드 1회 수령 + 즉시 지급 로직
     def claim_free_score(self, uid):
         with game_lock:
             data = self.get_user_data(uid)
@@ -241,7 +255,7 @@ class GameEngine:
             if last_round == self.round_id:
                 return 0, "이번 라운드에는 이미 받았습니다. 다음 판을 기다려주세요."
 
-            # 즉시 10만점 지급 및 라운드 기록
+            # 조건 통과: 10만점 지급
             add_score = 100000
             new_score = current_score + add_score
             
@@ -262,12 +276,12 @@ class GameEngine:
             if db:
                 ref = db.collection('users').document(uid)
                 if not ref.get().exists:
-                    ref.set({'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0})
+                    ref.set({'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0, 'last_claim_round': 0})
                 else:
                     ref.update({'nickname': nickname})
             else:
                 if uid not in memory_db['users']:
-                    memory_db['users'][uid] = {'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0}
+                    memory_db['users'][uid] = {'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0, 'last_claim_round': 0}
                 else:
                     memory_db['users'][uid]['nickname'] = nickname
             self.update_ranking_logic()
@@ -335,7 +349,7 @@ def get_status():
             current_score = user_data.get('score', 0)
             my_nick = user_data.get('nickname', 'Guest')
             
-            # [CHECK] DB에 저장된 마지막 받은 라운드가 == 현재 게임 라운드면 True
+            # DB에 저장된 마지막 받은 라운드가 == 현재 게임 라운드면 True
             last_round = user_data.get('last_claim_round', 0)
             if last_round == game.round_id:
                 already_claimed = True
@@ -363,7 +377,7 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
-        'already_claimed': already_claimed, # 클라이언트로 전송
+        'already_claimed': already_claimed, # 클라이언트가 확인할 값
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
@@ -453,6 +467,13 @@ def change_nickname():
     safe_nickname = html.escape(nickname)
     game.set_nickname(uid, safe_nickname)
     return jsonify({'success': True})
+
+# [ads.txt 설정] 구글 애드센스 검증용
+@app.route('/ads.txt')
+def ads_txt():
+    # 사용자님의 애드센스 정보
+    content = "google.com, pub-1641440800882293, DIRECT, f08c47fec0942fa0"
+    return make_response(content)
 
 if __name__ == '__main__':
     app.run(debug=is_debug, use_reloader=False, host='0.0.0.0')
