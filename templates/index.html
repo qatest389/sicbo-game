@@ -152,11 +152,15 @@
         .rule-text { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
         .reward-text { font-size: 0.8rem; color: #aaa; font-weight: normal; margin-top: 2px; }
         
-        .dice-lg { font-size: 4rem; line-height: 1; color: #fff; } 
-        .dice-md { font-size: 3.5rem; line-height: 1; color: #fff; } 
-        .dice-sm { font-size: 1.6rem; line-height: 1; color: #fff; }
-        .domino { display: flex; gap: 5px; }
-        .row-label { display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px solid rgba(255,255,255,0.1); color: var(--text-white); text-align: center; background: rgba(0,0,0,0.2); }
+        .nickname-display { 
+            font-size: 1.1rem; 
+            color: #ffffff; 
+            cursor: pointer; 
+            font-weight: bold; 
+            text-decoration: none; 
+            margin-bottom: 5px; 
+        }
+        .nickname-display:hover { color: #cccccc; }
 
         #toast-warning { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #ff5252; padding: 15px 30px; border-radius: 30px; border: 2px solid #ff5252; display: none; z-index: 3000; font-weight: bold; }
         #toast-warning.show { display: block; animation: fadein 0.3s; }
@@ -182,17 +186,6 @@
             padding: 12px 30px; font-size: 1rem; cursor: pointer; border: none; border-radius: 5px; width: 100%;
         }
         
-        /* [UI_FIX] 닉네임 스타일 변경: 흰색, 밑줄 제거, 커서 유지 */
-        .nickname-display { 
-            font-size: 1.1rem; 
-            color: #ffffff; /* 붉은색 -> 흰색 */
-            cursor: pointer; 
-            font-weight: bold; 
-            text-decoration: none; /* 밑줄 제거 */
-            margin-bottom: 5px; 
-        }
-        .nickname-display:hover { color: #cccccc; }
-
         .disclaimer-text { color: #ccc; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px; text-align: left; }
         .disclaimer-title { color: var(--text-gold); font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
     </style>
@@ -394,13 +387,13 @@
         if (!SESSION_TOKEN) return;
 
         try {
-            const res = await fetch('/status', {
+            // [Fix] 브라우저 캐싱 방지를 위한 timestamp 추가
+            const res = await fetch('/status?t=' + Date.now(), {
                 headers: { 'Authorization': 'Bearer ' + SESSION_TOKEN }
             });
             const data = await res.json();
             
             myNickname = data.nickname;
-            // [UI_FIX] 펜 아이콘 문자열 제거
             document.getElementById('my-nickname').innerText = (myNickname || "Guest");
 
             if (!isProcessing) {

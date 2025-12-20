@@ -6,7 +6,7 @@ import re
 import html
 import uuid
 import secrets
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, make_response
 
 # 운영 환경 설정
 is_debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
@@ -29,7 +29,6 @@ except Exception as e:
 game_lock = threading.Lock()
 session_store = {}
 
-# 메모리 DB (Firebase 연결 실패 시 사용)
 memory_db = {
     'users': {
         'Rich_Bot': {'score': 5000000, 'nickname': 'RichGuy', 'plays': 100, 'max_record': 50000},
@@ -57,31 +56,35 @@ class GameEngine:
 
     def game_loop(self):
         """
-        [BUG_FIX] 게임 루프가 에러로 인해 죽지 않도록 방어 코드 추가
+        [FIX] 로그 출력 및 에러 방어 코드
         """
+        print("🚀 [SYSTEM] Game Loop Started!")
         while True:
-            time.sleep(1) # CPU 과부하 방지 (Lock 바깥에 있어야 함)
+            time.sleep(1) # 1초 대기
             
             try:
                 with game_lock:
                     self.timer -= 1
+                    # [DEBUG] 로그에 시간 출력 (Render Logs에서 확인 가능)
+                    if self.timer % 5 == 0: 
+                        print(f"⏱️ [TIMER] State: {self.state}, Time: {self.timer}")
+
                     if self.timer <= 0:
                         self.next_state()
             except Exception as e:
-                # 에러가 나도 루프는 계속 돌아야 함 (로그만 출력)
-                print(f"🚨 [CRITICAL ERROR] Game Loop Error: {e}")
+                print(f"🚨 [CRITICAL ERROR] Loop crashed: {e}")
 
     def next_state(self):
         if self.state == 'SELECTION':
             self.state = 'RESULT' 
-            self.timer = 5 # 결과 보여주는 시간
+            self.timer = 5 
             self.roll_dice_logic()
             self.process_rewards()
             self.update_ranking_logic()
             
         elif self.state == 'RESULT':
             self.state = 'SELECTION'
-            self.timer = 15 # 선택 시간
+            self.timer = 15 
             self.current_predictions = {}
             self.round_outcomes = []
             self.last_round_delta = {} 
@@ -319,7 +322,8 @@ def get_status():
         display_sum = game.sum_val
         display_outcomes = game.round_outcomes
 
-    return jsonify({
+    # [FIX] 캐시 방지 헤더 추가
+    resp = make_response(jsonify({
         'state': game.state,
         'timer': game.timer,
         'dice': display_dice,
@@ -331,7 +335,10 @@ def get_status():
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
-    })
+    }))
+    resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    resp.headers['Pragma'] = 'no-cache'
+    return resp
 
 @app.route('/predict', methods=['POST'])
 def make_prediction():
