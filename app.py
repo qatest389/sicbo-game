@@ -165,21 +165,11 @@ class GameEngine:
                 self.update_user_stats(uid, 0, is_win=False)
 
     def get_user_data(self, uid):
-        default_data = {
-            'score': 1000000, 
-            'nickname': 'Guest', 
-            'plays': 0, 
-            'max_record': 0,
-            'last_claim_ts': time.time() 
-        }
+        default_data = {'score': 1000000, 'nickname': 'Guest', 'plays': 0, 'max_record': 0}
         if db:
             try:
                 doc = db.collection('users').document(uid).get()
-                if doc.exists: 
-                    data = doc.to_dict()
-                    if 'last_claim_ts' not in data:
-                        data['last_claim_ts'] = time.time()
-                    return data
+                if doc.exists: return doc.to_dict()
                 else:
                     db.collection('users').document(uid).set(default_data)
                     return default_data
@@ -188,8 +178,6 @@ class GameEngine:
                 return default_data
         else:
             if uid not in memory_db['users']: memory_db['users'][uid] = default_data
-            if 'last_claim_ts' not in memory_db['users'][uid]:
-                 memory_db['users'][uid]['last_claim_ts'] = time.time()
             return memory_db['users'][uid]
 
     def update_user_stats(self, uid, gained_points, is_win):
@@ -223,39 +211,21 @@ class GameEngine:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
     
+    # [FIX] 즉시 10만 점수 지급 로직 (시간 계산 제거)
     def claim_free_score(self, uid):
         with game_lock:
             data = self.get_user_data(uid)
             current_score = data.get('score', 0)
             
-            # 보유 점수가 1000점 이하일 때만 가능 (여유있게 1000 포함)
+            # 1000점 이하 확인
             if current_score > 1000:
                 return 0, "보유 점수가 1,000점 이하일 때만 가능합니다."
             
-            last_ts = data.get('last_claim_ts', time.time())
-            now = time.time()
-            elapsed = now - last_ts
-            
-            # [FIX] 시간이 꼬여서 마이너스가 나오면 리셋
-            if elapsed < 0:
-                last_ts = now
-                elapsed = 0
-                
-            intervals = int(elapsed // 30)
-            add_score = intervals * 1000
-            
-            if add_score > 5000: add_score = 5000
-            if add_score <= 0: return 0, "아직 쌓인 점수가 없습니다."
-            
+            # 즉시 10만점 지급
+            add_score = 100000
             new_score = current_score + add_score
             
-            # [FIX] 시간 보존 처리 (남은 초는 살려둠)
-            if add_score >= 5000:
-                new_last_ts = now
-            else:
-                new_last_ts = last_ts + (intervals * 30)
-            
-            update_payload = {'score': new_score, 'last_claim_ts': new_last_ts}
+            update_payload = {'score': new_score}
             
             if db:
                 db.collection('users').document(uid).update(update_payload)
@@ -269,37 +239,15 @@ class GameEngine:
             if db:
                 ref = db.collection('users').document(uid)
                 if not ref.get().exists:
-                    ref.set({'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0, 'last_claim_ts': time.time()})
+                    ref.set({'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0})
                 else:
                     ref.update({'nickname': nickname})
             else:
                 if uid not in memory_db['users']:
-                    memory_db['users'][uid] = {'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0, 'last_claim_ts': time.time()}
+                    memory_db['users'][uid] = {'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0}
                 else:
                     memory_db['users'][uid]['nickname'] = nickname
             self.update_ranking_logic()
-
-    # [FIX] 서버가 직접 계산해서 클라이언트에 줌 (시간 오류 원천 차단)
-    def calculate_free_info(self, uid):
-        data = self.get_user_data(uid)
-        last_ts = data.get('last_claim_ts', time.time())
-        now = time.time()
-        elapsed = now - last_ts
-        
-        if elapsed < 0: # 시간이 꼬였으면 0으로 처리
-            elapsed = 0
-        
-        accumulated = int(elapsed // 30) * 1000
-        if accumulated > 5000: accumulated = 5000
-        
-        # 남은 시간 계산
-        if accumulated >= 5000:
-            countdown = 0
-        else:
-            remainder = elapsed % 30
-            countdown = int(30 - remainder)
-            
-        return accumulated, countdown
 
 game = GameEngine()
 
@@ -353,11 +301,6 @@ def get_status():
     my_nick = "Guest"
     my_selections = {}
     round_result = 0
-    
-    # [FIX] 서버에서 계산된 값 변수
-    free_accumulated = 0
-    free_countdown = 30
-    
     remaining_time = game.get_remaining_time()
 
     if uid:
@@ -367,10 +310,6 @@ def get_status():
             my_nick = user_data.get('nickname', 'Guest')
             my_selections = game.current_predictions.get(uid, {})
             round_result = game.last_round_delta.get(uid, 0)
-            
-            # [FIX] 점수가 1000 이하면 서버에서 계산해서 전달
-            if current_score <= 1000:
-                free_accumulated, free_countdown = game.calculate_free_info(uid)
         except:
             pass
 
@@ -392,11 +331,6 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
-        # [FIX] 계산된 정보를 바로 보냄
-        'free_info': {
-            'accumulated': free_accumulated,
-            'countdown': free_countdown
-        },
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
@@ -468,7 +402,7 @@ def claim_free():
     
     added, msg = game.claim_free_score(uid)
     if added > 0:
-        return jsonify({'success': True, 'added': added, 'msg': f'{added} 점수를 획득했습니다!'})
+        return jsonify({'success': True, 'added': added, 'msg': '100,000 점수를 획득했습니다!'})
     else:
         return jsonify({'success': False, 'msg': msg})
 
