@@ -2,7 +2,11 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Dice Prediction Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Dice Prediction Game</title>
+    
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+     crossorigin="anonymous"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Roboto:wght@500;700&display=swap');
         
@@ -18,42 +22,73 @@
         
         body { 
             background-color: var(--bg-color); color: var(--text-white); 
-            font-family: 'Roboto', sans-serif; margin: 0; height: 100vh; width: 100vw;
-            overflow: hidden; display: flex; flex-direction: column;
+            font-family: 'Roboto', sans-serif; margin: 0; 
+            height: 100vh; width: 100vw;
+            display: flex; flex-direction: column;
+            overflow: hidden; /* 스크롤 방지 */
         }
+
+        /* --- [반응형 레이아웃] --- */
         
-        .ad-space {
-            background: #0f0f1a; border: 1px dashed #333; color: #555;
-            display: flex; justify-content: center; align-items: center;
-            font-size: 0.8rem; font-weight: bold; cursor: default;
-        }
+        /* 1. 상단/하단 광고 영역 */
         .ad-top-container, .ad-bottom-container {
-            height: 90px; width: 100%; display: flex; justify-content: center;
-            background: #0a0a12; flex-shrink: 0; z-index: 200;
+            width: 100%; min-height: 90px;
+            background: #0a0a12;
+            display: flex; justify-content: center; align-items: center;
+            flex-shrink: 0; z-index: 100;
         }
-        .ad-horizontal { width: 728px; height: 90px; }
-        .ad-vertical-container {
-            width: 160px; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; flex-shrink: 0;
-        }
-        .ad-vertical { width: 160px; height: 600px; }
 
+        /* 2. 메인 중앙 영역 (좌광고 + 게임 + 우광고) */
         .main-wrapper {
-            flex: 1; display: flex; justify-content: space-between; align-items: stretch;
-            width: 100%; overflow: hidden; padding: 0 10px;
+            flex: 1; 
+            display: flex; 
+            justify-content: center; /* 중앙 정렬 */
+            align-items: stretch;
+            width: 100%; 
+            overflow: hidden;
+            padding: 10px;
+            gap: 10px;
         }
 
+        /* 3. 좌우 사이드 광고 (PC 전용) */
+        .ad-vertical-container {
+            width: 160px; 
+            background: #0a0a12;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            flex-shrink: 0;
+            border-radius: 10px;
+        }
+
+        /* 4. 게임 컨테이너 (유동적 크기) */
         .game-container { 
-            flex: 1; display: flex; gap: 15px; 
+            flex: 1; /* 남은 공간 다 차지 */
+            max-width: 1200px; /* 너무 넓어지는 것 방지 */
+            display: flex; gap: 15px; 
             align-items: center; justify-content: center; 
-            height: 100%; min-width: 0; position: relative;
+            height: 100%; position: relative;
+            min-width: 0; /* Flexbox overflow 방지 */
         }
 
+        /* --- [모바일 대응 미디어 쿼리] --- */
+        @media (max-width: 1024px) {
+            /* 화면이 좁아지면 좌우 광고 숨김 (게임 공간 확보) */
+            .ad-vertical-container {
+                display: none; 
+            }
+            .main-wrapper {
+                padding: 5px;
+            }
+            .ad-top-container, .ad-bottom-container {
+                min-height: 60px; /* 상하단 광고 높이 줄임 */
+            }
+        }
+
+        /* --- 기존 게임 CSS 유지 --- */
         .side-panel { 
-            width: 220px; height: 750px; background: var(--board-color); 
+            width: 220px; height: 100%; max-height: 750px; background: var(--board-color); 
             border: 2px solid var(--accent-color); border-radius: 15px; 
             display: flex; flex-direction: column; position: relative; 
-            transition: all 0.3s ease-in-out; overflow: visible; z-index: 100; padding: 0; flex-shrink: 0;
+            transition: all 0.3s ease-in-out; overflow: visible; z-index: 90; padding: 0; flex-shrink: 0;
         }
         .side-panel.collapsed { width: 0; border-width: 0; margin: 0; opacity: 1; }
         .panel-content { padding: 15px; width: 220px; height: 100%; display: flex; flex-direction: column; transition: opacity 0.2s; opacity: 1; }
@@ -81,16 +116,17 @@
         .h-dice-group { display: flex; gap: 5px; } .h-die { font-size: 2rem; color: #eee; } 
 
         .game-board-border { 
-            max-width: 1000px; width: 100%;
-            background: var(--board-color); padding: 15px; border-radius: 20px; 
+            width: 100%; max-width: 1000px;
+            height: 100%; max-height: 800px; /* 높이 제한 */
+            background: var(--board-color); padding: 10px; border-radius: 20px; 
             border: 4px solid var(--accent-color); 
             box-shadow: 0 0 40px rgba(0,0,0,0.5); 
             display: flex; flex-direction: column;
-            position: relative;
+            position: relative; overflow-y: auto; /* 내용 넘치면 스크롤 */
         }
         .game-board-inner { 
             border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 5px; 
-            display: flex; flex-direction: column; gap: 5px;
+            display: flex; flex-direction: column; gap: 5px; flex: 1;
         }
 
         .help-btn {
@@ -109,48 +145,48 @@
 
         .top-info-section { 
             display: flex; justify-content: space-between; align-items: center; 
-            padding: 10px 30px; background: rgba(0,0,0,0.2); 
+            padding: 5px 20px; background: rgba(0,0,0,0.2); 
             border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; margin-bottom: 5px;
         }
         .info-box { text-align: center; } 
         .info-label { font-size: 0.8rem; color: #aaa; letter-spacing: 1px; } 
         .info-value { font-size: 1.2rem; font-family: 'Roboto', sans-serif; color: #fff; font-weight: bold; }
-        #game-status-bar { font-family: 'Roboto', sans-serif; font-size: 1.5rem; font-weight: bold; color: white; text-align: center; width: 300px;}
+        #game-status-bar { font-family: 'Roboto', sans-serif; font-size: 1.5rem; font-weight: bold; color: white; text-align: center; width: 250px;}
         .static-dice-container { display: flex; gap: 10px; }
-        .die-3d { width: 50px; height: 50px; background: #fff; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; font-size: 36px; color: #333; font-weight: bold; line-height: 1; }
+        .die-3d { width: 45px; height: 45px; background: #fff; border-radius: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.6); display: flex; justify-content: center; align-items: center; font-size: 32px; color: #333; font-weight: bold; line-height: 1; }
 
-        .top-section-layout { display: grid; grid-template-columns: 120px 1fr 120px; gap: 0; height: 220px; margin-bottom: 2px; }
-        .side-box { border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 10px; z-index: 1; }
-        .side-box h1 { font-size: 2rem; margin: 0; color: var(--text-white); }
+        .top-section-layout { display: grid; grid-template-columns: 100px 1fr 100px; gap: 0; height: 180px; margin-bottom: 2px; }
+        .side-box { border: 1px solid rgba(255,255,255,0.1); display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 5px; z-index: 1; }
+        .side-box h1 { font-size: 1.8rem; margin: 0; color: var(--text-white); }
         .center-grid { display: grid; grid-template-columns: repeat(3, 1fr) 1.5fr repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 0; grid-template-areas: "t1 t2 t3 any t4 t5 t6" "d1 d2 d3 any d4 d5 d6"; }
         
         #btn-TRIPLE_1 { grid-area: t1; } #btn-TRIPLE_2 { grid-area: t2; } #btn-TRIPLE_3 { grid-area: t3; } #btn-TRIPLE_4 { grid-area: t4; } #btn-TRIPLE_5 { grid-area: t5; } #btn-TRIPLE_6 { grid-area: t6; }
         #btn-DOUBLE_1 { grid-area: d1; } #btn-DOUBLE_2 { grid-area: d2; } #btn-DOUBLE_3 { grid-area: d3; } #btn-DOUBLE_4 { grid-area: d4; } #btn-DOUBLE_5 { grid-area: d5; } #btn-DOUBLE_6 { grid-area: d6; }
         #btn-ANY_TRIPLE { grid-area: any; background: rgba(255,255,255,0.05); }
 
-        .totals-row { display: grid; grid-template-columns: repeat(14, 1fr); gap: 0; height: 80px; }
+        .totals-row { display: grid; grid-template-columns: repeat(14, 1fr); gap: 0; height: 60px; }
         .total-item { justify-content: space-between; padding: 5px 0; background: rgba(255,255,255,0.03); }
-        .total-num { font-size: 1.5rem; font-weight: bold; color: #fff; font-family: 'Roboto'; }
+        .total-num { font-size: 1.2rem; font-weight: bold; color: #fff; font-family: 'Roboto'; }
 
-        .combos-row { display: grid; grid-template-columns: 70px 1fr; gap: 0; height: 85px; margin-top: 2px; border: 1px solid rgba(255,255,255,0.1); }
+        .combos-row { display: grid; grid-template-columns: 60px 1fr; gap: 0; height: 70px; margin-top: 2px; border: 1px solid rgba(255,255,255,0.1); }
         .combo-grid { display: grid; grid-template-columns: repeat(15, 1fr); gap: 0; } 
 
-        .singles-row { display: grid; grid-template-columns: 70px 1fr; gap: 0; height: 100px; margin-top: -1px; border: 1px solid rgba(255,255,255,0.1); border-top: none; }
+        .singles-row { display: grid; grid-template-columns: 60px 1fr; gap: 0; height: 80px; margin-top: -1px; border: 1px solid rgba(255,255,255,0.1); border-top: none; }
         .singles-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; } 
 
-        .bottom-controls { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
-        .point-selector { display: flex; gap: 12px; }
+        .bottom-controls { margin-top: 5px; display: flex; justify-content: space-between; align-items: center; padding: 5px 15px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); }
+        .point-selector { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
         .point-token { 
-            width: 55px; height: 55px; border-radius: 50%; 
+            width: 45px; height: 45px; border-radius: 50%; 
             display: flex; justify-content: center; align-items: center; cursor: pointer; 
             background: #2a2a40; border: 2px solid var(--accent-color); 
-            color: white; font-weight: bold; font-size: 0.8rem;
+            color: white; font-weight: bold; font-size: 0.7rem;
             transition: transform 0.2s;
         }
-        .point-token.selected { transform: translateY(-10px); border-color: var(--text-gold); background: var(--text-gold); color: black; }
+        .point-token.selected { transform: translateY(-5px); border-color: var(--text-gold); background: var(--text-gold); color: black; }
         
-        .btn { padding: 12px 30px; border-radius: 6px; border: none; font-weight: bold; font-family: 'Roboto'; cursor: pointer; font-size: 1.1rem; }
-        .btn-clear { background: #546e7a; color: white; margin-left: 20px; }
+        .btn { padding: 10px 20px; border-radius: 6px; border: none; font-weight: bold; font-family: 'Roboto'; cursor: pointer; font-size: 1rem; }
+        .btn-clear { background: #546e7a; color: white; margin-left: 10px; }
         
         .option-box { 
             border: 1px solid rgba(255, 255, 255, 0.1); background: transparent; 
@@ -161,15 +197,22 @@
         .option-box.active { background: rgba(233, 69, 96, 0.2); border: 1px solid var(--text-gold); z-index: 5; }
         .option-box.winner { background: rgba(0, 255, 204, 0.2) !important; border: 2px solid #00ffcc !important; box-shadow: inset 0 0 20px rgba(0,255,204,0.3); z-index: 10; }
         
-        .point-badge { position: absolute; top: -5px; right: -5px; width: 32px; height: 32px; background: var(--text-gold); border-radius: 50%; color: white; font-size: 0.7rem; font-weight: bold; display: flex; justify-content: center; align-items: center; z-index: 20; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        .point-badge { position: absolute; top: -5px; right: -5px; width: 24px; height: 24px; background: var(--text-gold); border-radius: 50%; color: white; font-size: 0.6rem; font-weight: bold; display: flex; justify-content: center; align-items: center; z-index: 20; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
         
-        .main-text { font-family: 'Roboto'; font-weight: bold; color: #fff; line-height: 1.1; font-size: 1rem; }
-        .rule-text { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
-        .reward-text { font-size: 0.8rem; color: #aaa; font-weight: normal; margin-top: 2px; }
+        .main-text { font-family: 'Roboto'; font-weight: bold; color: #fff; line-height: 1.1; font-size: 0.9rem; }
+        .rule-text { font-size: 0.6rem; color: #aaa; margin-top: 2px; }
+        .reward-text { font-size: 0.7rem; color: #aaa; font-weight: normal; margin-top: 1px; }
         
+        .dice-lg { font-size: 3rem; line-height: 1; color: #fff; } 
+        .dice-md { font-size: 2.5rem; line-height: 1; color: #fff; } 
+        .dice-sm { font-size: 1.2rem; line-height: 1; color: #fff; }
+        .domino { display: flex; gap: 2px; }
+        .row-label { display: flex; flex-direction: column; justify-content: center; align-items: center; border-right: 1px solid rgba(255,255,255,0.1); color: var(--text-white); text-align: center; background: rgba(0,0,0,0.2); }
+
         .nickname-display { font-size: 1.1rem; color: #ffffff; cursor: pointer; font-weight: bold; text-decoration: none; margin-bottom: 5px; }
         .nickname-display:hover { color: #cccccc; }
 
+        /* 무료 점수 충전 UI */
         #free-charge-panel {
             position: absolute;
             bottom: 20px; right: 20px;
@@ -220,10 +263,28 @@
 </head>
 <body>
 
-    <div class="ad-top-container"><div class="ad-space ad-horizontal">AD AREA (No Rewards)</div></div>
+    <div class="ad-top-container">
+        <ins class="adsbygoogle"
+             style="display:block; text-align:center;"
+             data-ad-layout="in-article"
+             data-ad-format="fluid"
+             data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+             data-ad-slot="XXXXXXXXXX"></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+    </div>
 
     <div class="main-wrapper">
-        <div class="ad-vertical-container"><div class="ad-space ad-vertical">AD AREA</div></div>
+        <div class="ad-vertical-container">
+            <ins class="adsbygoogle"
+                 style="display:block; width:160px; height:600px;"
+                 data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                 data-ad-slot="YYYYYYYYYY"></ins>
+            <script>
+                 (adsbygoogle = window.adsbygoogle || []).push({});
+            </script>
+        </div>
 
         <div class="game-container" id="gameContainer">
             <div class="side-panel" id="historyPanel">
@@ -348,7 +409,15 @@
             </div>
         </div>
 
-        <div class="ad-vertical-container"><div class="ad-space ad-vertical">AD AREA</div></div>
+        <div class="ad-vertical-container">
+            <ins class="adsbygoogle"
+                 style="display:block; width:160px; height:600px;"
+                 data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+                 data-ad-slot="YYYYYYYYYY"></ins>
+            <script>
+                 (adsbygoogle = window.adsbygoogle || []).push({});
+            </script>
+        </div>
     </div>
 
     <div id="free-charge-panel">
@@ -356,7 +425,17 @@
         <button class="btn-claim" onclick="claimFreeScore()">100,000점 받기</button>
     </div>
 
-    <div class="ad-bottom-container"><div class="ad-space ad-horizontal">AD AREA</div></div>
+    <div class="ad-bottom-container">
+        <ins class="adsbygoogle"
+             style="display:block; text-align:center;"
+             data-ad-layout="in-article"
+             data-ad-format="fluid"
+             data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+             data-ad-slot="XXXXXXXXXX"></ins>
+        <script>
+             (adsbygoogle = window.adsbygoogle || []).push({});
+        </script>
+    </div>
 
 <div id="disclaimer-modal" class="show">
     <div class="modal-box">
