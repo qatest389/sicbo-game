@@ -182,8 +182,16 @@
             padding: 12px 30px; font-size: 1rem; cursor: pointer; border: none; border-radius: 5px; width: 100%;
         }
         
-        .nickname-display { font-size: 1.1rem; color: var(--text-gold); cursor: pointer; font-weight: bold; text-decoration: underline; margin-bottom: 5px; }
-        .nickname-display:hover { color: white; }
+        /* [UI_FIX] 닉네임 스타일 변경: 흰색, 밑줄 제거, 커서 유지 */
+        .nickname-display { 
+            font-size: 1.1rem; 
+            color: #ffffff; /* 붉은색 -> 흰색 */
+            cursor: pointer; 
+            font-weight: bold; 
+            text-decoration: none; /* 밑줄 제거 */
+            margin-bottom: 5px; 
+        }
+        .nickname-display:hover { color: #cccccc; }
 
         .disclaimer-text { color: #ccc; font-size: 0.9rem; line-height: 1.6; margin-bottom: 20px; text-align: left; }
         .disclaimer-title { color: var(--text-gold); font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
@@ -214,7 +222,7 @@
                         </div>
                         
                         <div style="display:flex; flex-direction:column; align-items:center;">
-                            <div id="my-nickname" class="nickname-display" onclick="openNickModal()">Guest 🖊️</div>
+                            <div id="my-nickname" class="nickname-display" onclick="openNickModal()">Guest</div>
                             <div id="game-status-bar">CONNECTING...</div>
                         </div>
 
@@ -370,7 +378,7 @@
                 localStorage.setItem('sicbo_uid', USER_ID);
                 localStorage.setItem('sicbo_token', SESSION_TOKEN);
                 
-                setInterval(fetchGameStatus, 200); // 인증 성공 후 폴링 시작
+                setInterval(fetchGameStatus, 200); 
             }
         } catch(e) { console.error("Auth failed", e); }
     }
@@ -386,14 +394,14 @@
         if (!SESSION_TOKEN) return;
 
         try {
-            // [Fix] uid 쿼리 파라미터 제거, 헤더 인증 사용
             const res = await fetch('/status', {
                 headers: { 'Authorization': 'Bearer ' + SESSION_TOKEN }
             });
             const data = await res.json();
             
             myNickname = data.nickname;
-            document.getElementById('my-nickname').innerText = (myNickname || "Guest") + " 🖊️";
+            // [UI_FIX] 펜 아이콘 문자열 제거
+            document.getElementById('my-nickname').innerText = (myNickname || "Guest");
 
             if (!isProcessing) {
                 localScore = data.score; 
@@ -496,7 +504,7 @@
         if (!ranking) return;
         let html = '';
         ranking.forEach((user, index) => {
-            const isMe = user.uid === USER_ID ? 'rank-me' : ''; // uid 비교 로직 유지 (서버 ranking에서 uid 안보내면 닉네임 비교 등 필요하나 일단 유지)
+            const isMe = user.uid === USER_ID ? 'rank-me' : '';
             html += `<div class="ranking-item ${isMe}"><div class="rank-rank">${index + 1}</div><div class="rank-user">${user.nickname}</div><div class="rank-bal">${formatPoints(user.score)}</div></div>`;
         });
         listEl.innerHTML = html;
