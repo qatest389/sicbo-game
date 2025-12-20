@@ -26,15 +26,12 @@ try:
 except Exception as e:
     print(f"⚠️ [메모리 모드] 에러: {e}")
 
-# 동시성 제어를 위한 락 (여전히 필요함)
 game_lock = threading.Lock()
 session_store = {}
 
 memory_db = {
     'users': {
-        'Rich_Bot': {'score': 5000000, 'nickname': 'RichGuy', 'plays': 100, 'max_record': 50000},
-        'Lucky_Bot': {'score': 2500000, 'nickname': 'Lucky77', 'plays': 50, 'max_record': 150000},
-        'Newbie_Bot': {'score': 100000, 'nickname': 'Newbie', 'plays': 10, 'max_record': 5000}
+        # 초기 봇 데이터
     }
 }
 
@@ -44,7 +41,6 @@ class GameEngine:
     def __init__(self):
         self.state = 'SELECTION'
         self.duration = 15
-        # 서버 시작 시점 기준으로 목표 시간 설정
         self.end_time = time.time() + self.duration 
         
         self.dice = [1, 1, 1]
@@ -56,21 +52,15 @@ class GameEngine:
         self.cached_ranking = []
         self.update_ranking_logic()
 
-    # [FIX] 백그라운드 루프(Thread) 삭제 -> 요청 시 업데이트 방식으로 변경
     def check_state_update(self):
-        """
-        클라이언트가 상태를 요청할 때마다 호출됨.
-        시간이 다 되었는지 확인하고, 다 되었으면 다음 상태로 전이.
-        """
         now = time.time()
         if now >= self.end_time:
             with game_lock:
-                # 락을 얻고 나서 한 번 더 확인 (동시성 이슈 방지)
                 if time.time() >= self.end_time:
                     self.next_state()
 
     def get_remaining_time(self):
-        self.check_state_update() # 시간 확인 먼저 수행
+        self.check_state_update()
         remaining = int(self.end_time - time.time())
         return max(0, remaining)
 
@@ -118,7 +108,6 @@ class GameEngine:
                     'score': data.get('score', 0),
                     'plays': data.get('plays', 0)
                 })
-        
         self.cached_ranking = ranking_list
 
     def get_ranking(self):
@@ -188,11 +177,23 @@ class GameEngine:
                 self.update_user_stats(uid, 0, is_win=False)
 
     def get_user_data(self, uid):
-        default_data = {'score': 1000000, 'nickname': 'Guest', 'plays': 0, 'max_record': 0}
+        # last_claim_ts: 무료 충전소 마지막 사용 시간 (기본값: 현재시간)
+        default_data = {
+            'score': 1000000, 
+            'nickname': 'Guest', 
+            'plays': 0, 
+            'max_record': 0,
+            'last_claim_ts': time.time() 
+        }
         if db:
             try:
                 doc = db.collection('users').document(uid).get()
-                if doc.exists: return doc.to_dict()
+                if doc.exists: 
+                    data = doc.to_dict()
+                    # DB에 last_claim_ts가 없으면 추가
+                    if 'last_claim_ts' not in data:
+                        data['last_claim_ts'] = time.time()
+                    return data
                 else:
                     db.collection('users').document(uid).set(default_data)
                     return default_data
@@ -201,6 +202,9 @@ class GameEngine:
                 return default_data
         else:
             if uid not in memory_db['users']: memory_db['users'][uid] = default_data
+            # 메모리 모드에서도 키 확인
+            if 'last_claim_ts' not in memory_db['users'][uid]:
+                 memory_db['users'][uid]['last_claim_ts'] = time.time()
             return memory_db['users'][uid]
 
     def update_user_stats(self, uid, gained_points, is_win):
@@ -233,26 +237,58 @@ class GameEngine:
         else:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
+    
+    # [NEW] 무료 점수 지급 로직
+    def claim_free_score(self, uid):
+        with game_lock:
+            data = self.get_user_data(uid)
+            current_score = data.get('score', 0)
+            
+            # 1000점 초과면 수령 불가
+            if current_score > 1000:
+                return 0, "보유 점수가 1,000점 이하일 때만 가능합니다."
+            
+            last_ts = data.get('last_claim_ts', time.time())
+            now = time.time()
+            elapsed = now - last_ts
+            
+            # 30초당 1000점
+            intervals = int(elapsed // 30)
+            add_score = intervals * 1000
+            
+            if add_score > 5000: add_score = 5000
+            if add_score <= 0: return 0, "아직 쌓인 점수가 없습니다."
+            
+            new_score = current_score + add_score
+            
+            # DB 업데이트 (시간 리셋)
+            update_payload = {'score': new_score, 'last_claim_ts': now}
+            
+            if db:
+                db.collection('users').document(uid).update(update_payload)
+            else:
+                memory_db['users'][uid].update(update_payload)
+                
+            return add_score, "성공"
 
     def set_nickname(self, uid, nickname):
         with game_lock:
             if db:
                 ref = db.collection('users').document(uid)
                 if not ref.get().exists:
-                    ref.set({'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0})
+                    ref.set({'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0, 'last_claim_ts': time.time()})
                 else:
                     ref.update({'nickname': nickname})
             else:
                 if uid not in memory_db['users']:
-                    memory_db['users'][uid] = {'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0}
+                    memory_db['users'][uid] = {'score': 1000000, 'nickname': nickname, 'plays': 0, 'max_record': 0, 'last_claim_ts': time.time()}
                 else:
                     memory_db['users'][uid]['nickname'] = nickname
             self.update_ranking_logic()
 
-# 게임 엔진 초기화 (스레드 시작 안함)
 game = GameEngine()
 
-# --- 인증/보안 ---
+# --- Routes & Utils ---
 def generate_session_token(uid):
     token = secrets.token_hex(16)
     session_store[token] = uid
@@ -274,8 +310,6 @@ def validate_nickname(nickname):
     if not re.match(r'^[a-zA-Z0-9가-힣_]+$', nickname): return False
     return True
 
-# --- Routes ---
-
 @app.route('/')
 def home(): 
     return render_template('index.html')
@@ -294,7 +328,7 @@ def policy():
         'is_entertainment_only': True,
         'no_cashout': True,
         'no_transfer': True,
-        'message': "본 서비스는 오락 목적의 게임입니다. 포인트는 현금 가치가 없으며 환전, 양도, 거래가 불가능합니다."
+        'message': "본 서비스는 오락 목적의 게임입니다. 포인트(점수)는 현금 가치가 없습니다."
     })
 
 @app.route('/status')
@@ -304,8 +338,8 @@ def get_status():
     my_nick = "Guest"
     my_selections = {}
     round_result = 0
+    last_claim_ts = 0
     
-    # [FIX] 상태 업데이트 확인 (요청이 들어올 때 시간 체크)
     remaining_time = game.get_remaining_time()
 
     if uid:
@@ -313,6 +347,7 @@ def get_status():
             user_data = game.get_user_data(uid)
             current_score = user_data.get('score', 0)
             my_nick = user_data.get('nickname', 'Guest')
+            last_claim_ts = user_data.get('last_claim_ts', 0) # 클라이언트에게 전달
             my_selections = game.current_predictions.get(uid, {})
             round_result = game.last_round_delta.get(uid, 0)
         except:
@@ -336,12 +371,12 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
+        'last_claim_ts': last_claim_ts, # 추가됨
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
     }))
     resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-    resp.headers['Pragma'] = 'no-cache'
     return resp
 
 @app.route('/predict', methods=['POST'])
@@ -349,7 +384,6 @@ def make_prediction():
     uid = get_uid_from_request()
     if not uid: return jsonify({'success': False, 'msg': '로그인이 필요합니다.'}), 401
 
-    # [FIX] 베팅 전에도 상태 업데이트 체크
     game.check_state_update()
 
     with game_lock:
@@ -361,13 +395,13 @@ def make_prediction():
         try:
             points = int(data.get('points', 0))
         except:
-            return jsonify({'success': False, 'msg': '잘못된 포인트입니다.'})
+            return jsonify({'success': False, 'msg': '잘못된 점수입니다.'})
 
-        if points <= 0: return jsonify({'success': False, 'msg': '올바르지 않은 포인트입니다.'})
+        if points <= 0: return jsonify({'success': False, 'msg': '올바르지 않은 점수입니다.'})
 
         user_data = game.get_user_data(uid)
         if user_data['score'] < points: 
-            return jsonify({'success': False, 'msg': '포인트가 부족합니다.'})
+            return jsonify({'success': False, 'msg': '점수가 부족합니다.'})
 
         game.deduct_points(uid, points)
         
@@ -401,6 +435,18 @@ def clear_predictions():
         del game.current_predictions[uid]
     
     return jsonify({'success': True})
+
+# [NEW] 무료 점수 받기 API
+@app.route('/api/claim_free', methods=['POST'])
+def claim_free():
+    uid = get_uid_from_request()
+    if not uid: return jsonify({'success': False, 'msg': '로그인 필요'}), 401
+    
+    added, msg = game.claim_free_score(uid)
+    if added > 0:
+        return jsonify({'success': True, 'added': added, 'msg': f'{added} 점수를 획득했습니다!'})
+    else:
+        return jsonify({'success': False, 'msg': msg})
 
 @app.route('/user/nickname', methods=['POST'])
 def change_nickname():

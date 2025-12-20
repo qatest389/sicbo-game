@@ -152,15 +152,27 @@
         .rule-text { font-size: 0.7rem; color: #aaa; margin-top: 2px; }
         .reward-text { font-size: 0.8rem; color: #aaa; font-weight: normal; margin-top: 2px; }
         
-        .nickname-display { 
-            font-size: 1.1rem; 
-            color: #ffffff; 
-            cursor: pointer; 
-            font-weight: bold; 
-            text-decoration: none; 
-            margin-bottom: 5px; 
-        }
+        .nickname-display { font-size: 1.1rem; color: #ffffff; cursor: pointer; font-weight: bold; text-decoration: none; margin-bottom: 5px; }
         .nickname-display:hover { color: #cccccc; }
+
+        /* [NEW] 무료 점수 충전 UI */
+        #free-charge-panel {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            background: rgba(16, 16, 30, 0.95);
+            border: 2px solid var(--text-gold);
+            padding: 15px; border-radius: 12px;
+            display: none; /* 점수 1000 이하일 때만 표시 */
+            flex-direction: column; align-items: center;
+            box-shadow: 0 0 15px rgba(233, 69, 96, 0.3);
+            z-index: 4000;
+        }
+        .free-charge-title { color: var(--text-gold); font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; }
+        .free-charge-bar-bg { width: 150px; height: 10px; background: #333; border-radius: 5px; overflow: hidden; margin-bottom: 5px; }
+        .free-charge-bar-fill { height: 100%; background: #00ffcc; width: 0%; transition: width 0.5s; }
+        .free-charge-text { font-size: 0.8rem; color: white; margin-bottom: 8px; }
+        .btn-claim { background: #00ffcc; border: none; padding: 5px 15px; border-radius: 5px; color: black; font-weight: bold; cursor: pointer; }
+        .btn-claim:disabled { background: #555; color: #888; cursor: not-allowed; }
 
         #toast-warning { position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #ff5252; padding: 15px 30px; border-radius: 30px; border: 2px solid #ff5252; display: none; z-index: 3000; font-weight: bold; }
         #toast-warning.show { display: block; animation: fadein 0.3s; }
@@ -210,8 +222,7 @@
                 <div class="game-board-inner">
                     <div class="top-info-section">
                         <div class="info-box">
-                            <div class="info-label">SCORE</div>
-                            <div class="info-value" id="points">0</div>
+                            <div class="info-label">SCORE</div> <div class="info-value" id="points">0</div>
                         </div>
                         
                         <div style="display:flex; flex-direction:column; align-items:center;">
@@ -321,6 +332,15 @@
         <div class="ad-vertical-container"><div class="ad-space ad-vertical">AD AREA</div></div>
     </div>
 
+    <div id="free-charge-panel">
+        <div class="free-charge-title">FREE CHARGE</div>
+        <div class="free-charge-bar-bg">
+            <div class="free-charge-bar-fill" id="free-charge-fill"></div>
+        </div>
+        <div class="free-charge-text" id="free-charge-text">0 / 5000</div>
+        <button class="btn-claim" id="btn-claim-score" onclick="claimFreeScore()" disabled>받기</button>
+    </div>
+
     <div class="ad-bottom-container"><div class="ad-space ad-horizontal">AD AREA</div></div>
 
 <div id="disclaimer-modal" class="show">
@@ -328,8 +348,8 @@
         <div class="disclaimer-title">NOTICE</div>
         <div class="disclaimer-text">
             본 서비스는 오락 목적의 단순 게임입니다.<br><br>
-            • 게임 내 포인트는 현금 가치가 없습니다.<br>
-            • 포인트는 환전, 양도, 거래가 불가능합니다.<br>
+            • 게임 내 점수(Score)는 현금 가치가 없습니다.<br>
+            • 점수는 환전, 양도, 거래가 불가능합니다.<br>
             • 어떠한 형태의 금전적 보상도 제공하지 않습니다.
         </div>
         <button class="action-btn" onclick="closeDisclaimer()">I UNDERSTAND</button>
@@ -355,6 +375,8 @@
     let localScore = 0;
     let isProcessing = false;
     let myNickname = null;
+    let lastClaimTs = 0; // [NEW] 마지막 무료 충전 시간
+
     const diceChars = ['⚀','⚁','⚂','⚃','⚄','⚅'];
 
     async function initAuth() {
@@ -371,7 +393,8 @@
                 localStorage.setItem('sicbo_uid', USER_ID);
                 localStorage.setItem('sicbo_token', SESSION_TOKEN);
                 
-                setInterval(fetchGameStatus, 200); 
+                setInterval(fetchGameStatus, 200);
+                setInterval(updateFreeChargeUI, 1000); // [NEW] 무료 충전 UI 1초마다 갱신
             }
         } catch(e) { console.error("Auth failed", e); }
     }
@@ -387,7 +410,6 @@
         if (!SESSION_TOKEN) return;
 
         try {
-            // [Fix] 브라우저 캐싱 방지를 위한 timestamp 추가
             const res = await fetch('/status?t=' + Date.now(), {
                 headers: { 'Authorization': 'Bearer ' + SESSION_TOKEN }
             });
@@ -395,11 +417,71 @@
             
             myNickname = data.nickname;
             document.getElementById('my-nickname').innerText = (myNickname || "Guest");
+            
+            // [NEW] 서버에서 받은 마지막 충전 시간 저장
+            lastClaimTs = data.last_claim_ts || 0;
 
             if (!isProcessing) {
                 localScore = data.score; 
             }
             updateUI(data);
+        } catch(e) { console.error(e); }
+    }
+    
+    // [NEW] 무료 점수 UI 업데이트 로직
+    function updateFreeChargeUI() {
+        const panel = document.getElementById('free-charge-panel');
+        const fill = document.getElementById('free-charge-fill');
+        const text = document.getElementById('free-charge-text');
+        const btn = document.getElementById('btn-claim-score');
+        
+        // 점수가 1000 이하일 때만 보임
+        if (localScore <= 1000) {
+            panel.style.display = 'flex';
+            
+            // 경과 시간 계산
+            const now = Date.now() / 1000;
+            const elapsed = now - lastClaimTs;
+            
+            // 30초당 1000점
+            let accumulated = Math.floor(elapsed / 30) * 1000;
+            if (accumulated > 5000) accumulated = 5000;
+            if (accumulated < 0) accumulated = 0;
+            
+            // UI 반영
+            const pct = (accumulated / 5000) * 100;
+            fill.style.width = pct + '%';
+            text.innerText = `${accumulated.toLocaleString()} / 5,000`;
+            
+            if (accumulated > 0) {
+                btn.disabled = false;
+                btn.style.background = "#00ffcc";
+            } else {
+                btn.disabled = true;
+                btn.style.background = "#555";
+            }
+        } else {
+            panel.style.display = 'none';
+        }
+    }
+    
+    // [NEW] 무료 점수 받기 요청
+    async function claimFreeScore() {
+        try {
+            const res = await fetch('/api/claim_free', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + SESSION_TOKEN }
+            });
+            const data = await res.json();
+            if(data.success) {
+                showWarning(data.msg);
+                // 즉시 갱신
+                fetchGameStatus();
+                // 버튼 비활성화 (UX용)
+                document.getElementById('btn-claim-score').disabled = true;
+            } else {
+                showWarning(data.msg);
+            }
         } catch(e) { console.error(e); }
     }
 
@@ -514,7 +596,7 @@
     async function predict(type) {
         const statusText = document.getElementById('game-status-bar').innerText;
         if(!statusText.includes("SELECT")) return showWarning("선택 시간이 아닙니다.");
-        if(localScore < currentPoint) return showWarning("포인트가 부족합니다.");
+        if(localScore < currentPoint) return showWarning("점수가 부족합니다.");
 
         isProcessing = true;
         localScore -= currentPoint;
