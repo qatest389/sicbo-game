@@ -8,7 +8,6 @@ import secrets
 import threading
 from flask import Flask, jsonify, request, render_template, make_response
 
-# 운영 환경 설정
 is_debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
 
 # --- [Firebase 설정] ---
@@ -29,11 +28,7 @@ except Exception as e:
 game_lock = threading.Lock()
 session_store = {}
 
-memory_db = {
-    'users': {
-        # 초기 봇 데이터
-    }
-}
+memory_db = { 'users': {} }
 
 app = Flask(__name__)
 
@@ -69,16 +64,13 @@ class GameEngine:
             self.state = 'RESULT' 
             self.duration = 5
             self.end_time = time.time() + self.duration
-            
             self.roll_dice_logic()
             self.process_rewards()
             self.update_ranking_logic()
-            
         elif self.state == 'RESULT':
             self.state = 'SELECTION'
             self.duration = 15
             self.end_time = time.time() + self.duration
-            
             self.current_predictions = {}
             self.round_outcomes = []
             self.last_round_delta = {} 
@@ -92,9 +84,7 @@ class GameEngine:
                     data = doc.to_dict()
                     nick = data.get('nickname', doc.id[:6])
                     ranking_list.append({
-                        'nickname': nick, 
-                        'score': data.get('score', 0),
-                        'plays': data.get('plays', 0)
+                        'nickname': nick, 'score': data.get('score', 0), 'plays': data.get('plays', 0)
                     })
             except Exception as e:
                 print(f"Ranking Error: {e}")
@@ -104,9 +94,7 @@ class GameEngine:
             for uid, data in sorted_users[:10]:
                 nick = data.get('nickname', uid[:6])
                 ranking_list.append({
-                    'nickname': nick, 
-                    'score': data.get('score', 0),
-                    'plays': data.get('plays', 0)
+                    'nickname': nick, 'score': data.get('score', 0), 'plays': data.get('plays', 0)
                 })
         self.cached_ranking = ranking_list
 
@@ -177,7 +165,6 @@ class GameEngine:
                 self.update_user_stats(uid, 0, is_win=False)
 
     def get_user_data(self, uid):
-        # last_claim_ts: 무료 충전소 마지막 사용 시간 (기본값: 현재시간)
         default_data = {
             'score': 1000000, 
             'nickname': 'Guest', 
@@ -190,7 +177,6 @@ class GameEngine:
                 doc = db.collection('users').document(uid).get()
                 if doc.exists: 
                     data = doc.to_dict()
-                    # DB에 last_claim_ts가 없으면 추가
                     if 'last_claim_ts' not in data:
                         data['last_claim_ts'] = time.time()
                     return data
@@ -202,7 +188,6 @@ class GameEngine:
                 return default_data
         else:
             if uid not in memory_db['users']: memory_db['users'][uid] = default_data
-            # 메모리 모드에서도 키 확인
             if 'last_claim_ts' not in memory_db['users'][uid]:
                  memory_db['users'][uid]['last_claim_ts'] = time.time()
             return memory_db['users'][uid]
@@ -238,13 +223,13 @@ class GameEngine:
             current = self.get_user_data(uid)['score']
             memory_db['users'][uid]['score'] = current + amount
     
-    # [NEW] 무료 점수 지급 로직
+    # [FIX] 무료 점수 지급 로직 개선 (시간 보존)
     def claim_free_score(self, uid):
         with game_lock:
             data = self.get_user_data(uid)
             current_score = data.get('score', 0)
             
-            # 1000점 초과면 수령 불가
+            # 보유 점수가 1000점 이하일 때만 (여유있게 1000 포함)
             if current_score > 1000:
                 return 0, "보유 점수가 1,000점 이하일 때만 가능합니다."
             
@@ -261,8 +246,13 @@ class GameEngine:
             
             new_score = current_score + add_score
             
-            # DB 업데이트 (시간 리셋)
-            update_payload = {'score': new_score, 'last_claim_ts': now}
+            # [FIX] 시간을 완전히 리셋하지 않고, 지급한 점수만큼의 시간만 더함 (나머지 초 보존)
+            if add_score >= 5000:
+                new_last_ts = now # 최대치면 현재 시간으로 리셋
+            else:
+                new_last_ts = last_ts + (intervals * 30) # 나머지 시간 보존
+            
+            update_payload = {'score': new_score, 'last_claim_ts': new_last_ts}
             
             if db:
                 db.collection('users').document(uid).update(update_payload)
@@ -339,7 +329,6 @@ def get_status():
     my_selections = {}
     round_result = 0
     last_claim_ts = 0
-    
     remaining_time = game.get_remaining_time()
 
     if uid:
@@ -347,7 +336,7 @@ def get_status():
             user_data = game.get_user_data(uid)
             current_score = user_data.get('score', 0)
             my_nick = user_data.get('nickname', 'Guest')
-            last_claim_ts = user_data.get('last_claim_ts', 0) # 클라이언트에게 전달
+            last_claim_ts = user_data.get('last_claim_ts', 0)
             my_selections = game.current_predictions.get(uid, {})
             round_result = game.last_round_delta.get(uid, 0)
         except:
@@ -371,7 +360,7 @@ def get_status():
         'history': game.history,
         'score': current_score,
         'nickname': my_nick,
-        'last_claim_ts': last_claim_ts, # 추가됨
+        'last_claim_ts': last_claim_ts,
         'my_selections': my_selections,
         'round_result': round_result,
         'ranking': game.get_ranking()
@@ -436,7 +425,6 @@ def clear_predictions():
     
     return jsonify({'success': True})
 
-# [NEW] 무료 점수 받기 API
 @app.route('/api/claim_free', methods=['POST'])
 def claim_free():
     uid = get_uid_from_request()

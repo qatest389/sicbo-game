@@ -86,14 +86,13 @@
             border: 4px solid var(--accent-color); 
             box-shadow: 0 0 40px rgba(0,0,0,0.5); 
             display: flex; flex-direction: column;
-            position: relative; /* 도움말 버튼 위치 기준 */
+            position: relative;
         }
         .game-board-inner { 
             border: 2px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 5px; 
             display: flex; flex-direction: column; gap: 5px;
         }
 
-        /* [NEW] 도움말 버튼 스타일 */
         .help-btn {
             position: absolute; top: 15px; right: 15px;
             width: 32px; height: 32px;
@@ -171,7 +170,6 @@
         .nickname-display { font-size: 1.1rem; color: #ffffff; cursor: pointer; font-weight: bold; text-decoration: none; margin-bottom: 5px; }
         .nickname-display:hover { color: #cccccc; }
 
-        /* 무료 점수 충전 UI */
         #free-charge-panel {
             position: absolute;
             bottom: 20px; right: 20px;
@@ -207,7 +205,6 @@
             background: #1a1a2e; border: 2px solid var(--text-gold); padding: 40px; 
             border-radius: 20px; text-align: center; box-shadow: 0 0 50px rgba(0,0,0,0.8); max-width: 400px; width: 90%;
         }
-        /* 도움말 모달 전용 스타일 */
         .help-content { text-align: left; margin: 20px 0; max-height: 60vh; overflow-y: auto; color: #ddd; font-size: 0.9rem; line-height: 1.6; }
         .help-content h3 { color: var(--text-gold); margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 5px; }
         .help-content ul { padding-left: 20px; }
@@ -386,23 +383,23 @@
 
 <div id="help-modal">
     <div class="modal-box">
-        <h2 style="color:var(--text-gold); margin-top:0;">GAME RULES</h2>
+        <h2 style="color:var(--text-gold); margin-top:0;">GAME GUIDE</h2>
         <div class="help-content">
-            <h3>🎲 게임 방법</h3>
+            <h3>🎲 플레이 방법</h3>
             <ul>
-                <li>주사위 3개의 결과를 예측하여 베팅하세요.</li>
-                <li><strong>SELECT</strong> 시간에 원하는 구역을 클릭하여 베팅합니다.</li>
-                <li><strong>RESULT</strong> 시간에 주사위 결과가 공개되고 배당금을 획득합니다.</li>
+                <li>주사위 3개의 결과를 <strong>예측</strong>하여 원하는 구역을 선택하세요.</li>
+                <li><strong>SELECT</strong> 시간에 점수를 사용하여 예측에 참여합니다.</li>
+                <li><strong>RESULT</strong> 시간에 결과가 적중하면 <strong>점수 보상</strong>을 획득합니다.</li>
             </ul>
 
             <h3>⚡ 무료 충전소</h3>
             <ul>
                 <li>보유 점수가 <strong>1,000점 이하</strong>일 때 활성화됩니다.</li>
-                <li><strong>30초마다 1,000점</strong>씩 자동으로 쌓입니다.</li>
+                <li><strong>30초마다 1,000점</strong>씩 자동으로 충전됩니다.</li>
                 <li>최대 <strong>5,000점</strong>까지 누적되며 [받기] 버튼을 눌러야 획득합니다.</li>
             </ul>
 
-            <h3>🏆 주요 배당률</h3>
+            <h3>🏆 점수 획득 배율</h3>
             <ul>
                 <li><strong>SMALL (4-10):</strong> 1배 (단, Triple 제외)</li>
                 <li><strong>BIG (11-17):</strong> 1배 (단, Triple 제외)</li>
@@ -465,7 +462,6 @@
         checkNicknameNeeded();
     }
 
-    // [NEW] 도움말 모달 함수
     function openHelp() {
         document.getElementById('help-modal').classList.add('show');
     }
@@ -524,7 +520,7 @@
                 timerText.innerText = `다음 충전: ${secondsUntilNext}초`;
             }
             
-            if (accumulated > 0) {
+            if (accumulated >= 1000) {
                 btn.disabled = false;
                 btn.style.background = "#00ffcc";
             } else {
