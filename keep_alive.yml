@@ -1,19 +1,18 @@
 name: Keep Server Alive
 
 on:
-  # 14분마다 자동 실행 (Render 무료 서버는 15분 미사용 시 잠드므로 14분이 적당합니다)
   schedule:
-    - cron: "*/14 * * * *"
-  # GitHub 사이트에서 수동으로 버튼 눌러 실행할 수 있게 함
-  workflow_dispatch:
+    # 13분마다 실행 (Render 제한시간 15분보다 조금 더 안전하게 앞당김)
+    - cron: "*/13 * * * *"
+  workflow_dispatch: # 수동 실행 버튼
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Render Server
+      - name: Ping Render Server (Fake Browser)
         run: |
-          echo "Render 서버 깨우기 시작..."
-          # curl 명령어로 내 사이트에 접속 요청을 보냅니다.
-          curl -I https://sicbo-game.onrender.com/
-          echo "접속 요청 완료!"
+          echo "서버 깨우기 (브라우저인 척 위장)..."
+          # -A 옵션으로 크롬 브라우저인 척 위장하여 접속
+          curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" https://sicbo-game.onrender.com/
+          echo "핑 전송 완료!"
